@@ -125,14 +125,14 @@ window.addEventListener('load', async () => {
             userData = JSON.parse(storedData)
         }
         
-        if (!userData || userData.role !== 'pemantau') {
+        if (!userData || userData.role !== 'Pemantau') {
             window.location.href = "index.html"
             return
         }
         
-        document.getElementById("userName").textContent = userData.nama || "pemantau"
+        document.getElementById("userName").textContent = userData.nama || "Pemantau"
         document.getElementById("avatar").textContent = (userData.nama || "K").charAt(0).toUpperCase()
-        document.getElementById("userRole").textContent = "pemantau - Fasilitator"
+        document.getElementById("userRole").textContent = "Pemantau - Fasilitator"
         
         const logoutBtn = document.getElementById("logoutBtn")
         if (logoutBtn) logoutBtn.addEventListener("click", logout)
@@ -269,8 +269,8 @@ async function loadRekapHarian() {
             const lokasi = p ? (p.lokasi === 'kantor' ? 'Kantor Pusat' : (p.lokasi || '-')) : '-'
             
             let roleBadge = ''
-            if (user.role === 'pemantau') {
-                roleBadge = '<span style="background:#F39C12; color:white; padding:2px 6px; border-radius:10px; font-size:10px; margin-left:5px;">📋 Koord</span>'
+            if (user.role === 'Pemantau') {
+                roleBadge = '<span style="background:#F39C12; color:white; padding:2px 6px; border-radius:10px; font-size:10px; margin-left:5px;">📋 Pemantau</span>'
             }
             
             html += `
