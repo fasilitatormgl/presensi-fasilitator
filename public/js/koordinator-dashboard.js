@@ -112,13 +112,13 @@ window.setMode = function(mode) {
         document.getElementById('rekapBulanan').style.display = 'block'
         document.getElementById('btnHarian').style.background = '#3498DB'
         document.getElementById('btnBulanan').style.background = '#EE2737'
-        loadRekapBulanan()
+        RekapBulanan()
     }
 }
 
 // ========== INIT DASHBOARD ==========
-window.addEventListener('load', async () => {
-    showLoading(true)
+window.addEventListener('', async () => {
+    showing(true)
     
     try {
         const storedData = localStorage.getItem("userData")
@@ -145,7 +145,7 @@ window.addEventListener('load', async () => {
         document.getElementById("filterTahun").value = new Date().getFullYear()
         currentFilter.tanggal = today
         
-        await loadData()
+        await Data()
         await loadFilterOptions()
         await getLokasiUser()
         await cekStatusPresensi()
@@ -165,15 +165,18 @@ async function loadData() {
         const usersSnap = await getDocs(collection(db, "users"))
         allUsers = []
         usersSnap.forEach(doc => {
-            const data = doc.data()
-            if (data.role !== 'admin') {
-                allUsers.push({ 
-                    id: doc.id,
-                    uid: data.uid || doc.id,
-                    ...data 
-                })
-            }
+    const data = doc.data()
+    const role = (data.role || "").toLowerCase()
+
+    // Hanya yang ikut absensi
+    if (role === "fasilitator" || role === "koordinator") {
+        allUsers.push({
+            id: doc.id,
+            uid: data.uid || doc.id,
+            ...data
         })
+    }
+})
         
         const presensiSnap = await getDocs(collection(db, "presensi"))
         allPresensi = []
