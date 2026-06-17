@@ -40,10 +40,10 @@ async function logout() {
     }
 }
 
-// ========== FUNGSI LOADING & ERROR ==========
-function showLoading(show) {
-    const loadingEl = document.getElementById("loading")
-    if (loadingEl) loadingEl.style.display = show ? "flex" : "none"
+// ========== FUNGSI ING & ERROR ==========
+function showing(show) {
+    const ingEl = document.getElementById("ing")
+    if (ingEl) ingEl.style.display = show ? "flex" : "none"
 }
 
 function showError(message) {
@@ -89,7 +89,7 @@ window.showTab = function(tab) {
         document.getElementById('tabRekapContent').style.display = 'block'
         document.getElementById('tabAbsensi').style.background = '#3498DB'
         document.getElementById('tabRekap').style.background = '#EE2737'
-        loadRekap()
+        Rekap()
     }
 }
 
@@ -104,7 +104,7 @@ window.setMode = function(mode) {
         document.getElementById('rekapBulanan').style.display = 'none'
         document.getElementById('btnHarian').style.background = '#EE2737'
         document.getElementById('btnBulanan').style.background = '#3498DB'
-        loadRekapHarian()
+        RekapHarian()
     } else {
         document.getElementById('filterHarian').style.display = 'none'
         document.getElementById('filterBulanan').style.display = 'block'
@@ -146,16 +146,16 @@ window.addEventListener('', async () => {
         currentFilter.tanggal = today
         
         await Data()
-        await loadFilterOptions()
+        await FilterOptions()
         await getLokasiUser()
         await cekStatusPresensi()
-        await loadRekapHarian()
+        await RekapHarian()
         
     } catch (error) {
         console.error("Error:", error)
         showError("Gagal memuat dashboard pastikan lokasi aktif")
     } finally {
-        showLoading(false)
+        showing(false)
     }
 })
 
@@ -166,10 +166,8 @@ async function loadData() {
         allUsers = []
         usersSnap.forEach(doc => {
     const data = doc.data()
-    const role = (data.role || "").toLowerCase()
 
-    // Hanya yang ikut absensi
-    if (role === "fasilitator" || role === "koordinator") {
+    if (data.role !== "admin") {
         allUsers.push({
             id: doc.id,
             uid: data.uid || doc.id,
