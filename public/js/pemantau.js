@@ -163,17 +163,17 @@ async function loadData() {
     try {
         const usersSnap = await getDocs(collection(db, "users"))
         allUsers = []
-        usersSnap.forEach(doc => {
-            const data = doc.data()
-            if (    data.role === "fasilitator" ||
-    data.role === "koordinator") {
-                allUsers.push({ 
-                    id: doc.id,
-                    uid: data.uid || doc.id,
-                    ...data 
-                })
-            }
+       usersSnap.forEach(doc => {
+    const data = doc.data()
+
+    if (data.role !== "admin"|| role === "pemantau") {
+        allUsers.push({
+            id: doc.id,
+            uid: data.uid || doc.id,
+            ...data
         })
+    }
+})
         
         const presensiSnap = await getDocs(collection(db, "presensi"))
         allPresensi = []
