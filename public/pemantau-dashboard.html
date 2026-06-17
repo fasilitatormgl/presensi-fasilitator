@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pemantau - Monitoring Fasilitator</title>
     <link rel="stylesheet" href="css/style.css">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 </head>
 <body>
     <div class="header">
@@ -35,6 +34,7 @@
         <button class="btn-filter" id="tabBulanan" style="flex: 1; background: #3498DB;" onclick="showTab('bulanan')">📊 Bulanan</button>
     </div>
     
+    <!-- TAB HARIAN -->
     <div id="tabHarianContent">
         <div class="stats-grid">
             <div class="stat-card">
@@ -62,15 +62,15 @@
             </div>
             
             <div class="filter-group" style="margin-bottom: 10px;">
-                <select id="filterKelurahanHarian" class="filter-select">
+                <select id="filterKelurahan" class="filter-select">
                     <option value="">Semua Kelurahan</option>
                 </select>
             </div>
             
             <div class="filter-group">
                 <input type="date" id="filterTanggal" class="filter-date">
-                <button class="btn-filter" onclick="applyFilterHarian()" style="background: #27AE60;">Terapkan</button>
-                <button class="btn-reset" onclick="resetFilterHarian()">Reset</button>
+                <button class="btn-filter" onclick="applyFilter()" style="background: #27AE60;">Terapkan</button>
+                <button class="btn-reset" onclick="resetFilter()">Reset</button>
             </div>
 
             <div style="margin-top: 15px;">
@@ -106,6 +106,7 @@
         </div>
     </div>
     
+    <!-- TAB BULANAN -->
     <div id="tabBulananContent" style="display: none;">
         <div class="card">
             <div class="card-title">
@@ -138,8 +139,8 @@
                     <option value="2026">2026</option>
                     <option value="2027">2027</option>
                 </select>
-                <button class="btn-filter" onclick="applyFilterBulanan()" style="background: #27AE60;">Terapkan</button>
-                <button class="btn-reset" onclick="resetFilterBulanan()">Reset</button>
+                <button class="btn-filter" onclick="applyFilter()" style="background: #27AE60;">Terapkan</button>
+                <button class="btn-reset" onclick="resetFilter()">Reset</button>
             </div>
 
             <div style="margin-top: 15px;">
