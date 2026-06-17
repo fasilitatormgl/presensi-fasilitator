@@ -69,39 +69,19 @@ function formatBulan(bulan, tahun) {
 
 // ========== SWITCH TAB ==========
 window.showTab = function(tab) {
-    if (tab === 'absensi') {
-        document.getElementById('tabAbsensiContent').style.display = 'block'
-        document.getElementById('tabRekapContent').style.display = 'none'
-        document.getElementById('tabAbsensi').style.background = '#EE2737'
-        document.getElementById('tabRekap').style.background = '#3498DB'
-    } else {
-        document.getElementById('tabAbsensiContent').style.display = 'none'
-        document.getElementById('tabRekapContent').style.display = 'block'
-        document.getElementById('tabAbsensi').style.background = '#3498DB'
-        document.getElementById('tabRekap').style.background = '#EE2737'
-        loadRekap()
-    }
-}
-
-// ========== SET MODE REKAP ==========
-window.setMode = function(mode) {
-    currentMode = mode
-
-    if (mode === 'harian') {
-        document.getElementById('filterHarian').style.display = 'block'
-        document.getElementById('filterBulanan').style.display = 'none'
-        document.getElementById('rekapHarian').style.display = 'block'
-        document.getElementById('rekapBulanan').style.display = 'none'
-        document.getElementById('btnHarian').style.background = '#EE2737'
-        document.getElementById('btnBulanan').style.background = '#3498DB'
+    if (tab === 'harian') {
+        document.getElementById('tabHarianContent').style.display = 'block'
+        document.getElementById('tabBulananContent').style.display = 'none'
+        document.getElementById('tabHarian').style.background = '#EE2737'
+        document.getElementById('tabBulanan').style.background = '#3498DB'
+        currentMode = 'harian'
         loadRekapHarian()
     } else {
-        document.getElementById('filterHarian').style.display = 'none'
-        document.getElementById('filterBulanan').style.display = 'block'
-        document.getElementById('rekapHarian').style.display = 'none'
-        document.getElementById('rekapBulanan').style.display = 'block'
-        document.getElementById('btnHarian').style.background = '#3498DB'
-        document.getElementById('btnBulanan').style.background = '#EE2737'
+        document.getElementById('tabHarianContent').style.display = 'none'
+        document.getElementById('tabBulananContent').style.display = 'block'
+        document.getElementById('tabHarian').style.background = '#3498DB'
+        document.getElementById('tabBulanan').style.background = '#EE2737'
+        currentMode = 'bulanan'
         loadRekapBulanan()
     }
 }
@@ -109,14 +89,17 @@ window.setMode = function(mode) {
 // ========== INIT DASHBOARD ==========
 window.addEventListener('load', async () => {
     showLoading(true)
+    console.log("🚀 Memulai inisialisasi dashboard pemantau...")
 
     try {
         const storedData = localStorage.getItem("userData")
         if (storedData) {
             userData = JSON.parse(storedData)
+            console.log("📦 Data user dari localStorage:", userData)
         }
 
         if (!userData || userData.role !== 'pemantau') {
+            console.log("❌ Bukan pemantau, redirect ke login")
             window.location.href = "index.html"
             return
         }
@@ -134,14 +117,19 @@ window.addEventListener('load', async () => {
         document.getElementById("filterTahun").value = new Date().getFullYear()
         currentFilter.tanggal = today
 
+        console.log("📥 Memuat data dari Firestore...")
         await loadData()
+        console.log("✅ Data berhasil dimuat:", { allUsers: allUsers.length, allPresensi: allPresensi.length })
+
         await loadFilterOptions()
         await cekStatusLokasiAktif()
         await loadRekapHarian()
 
+        console.log("✅ Dashboard pemantau siap!")
+
     } catch (error) {
-        console.error("Error:", error)
-        showError("Gagal memuat dashboard pemantau")
+        console.error("❌ Error inisialisasi:", error)
+        showError("Gagal memuat dashboard pemantau: " + error.message)
     } finally {
         showLoading(false)
     }
@@ -150,10 +138,12 @@ window.addEventListener('load', async () => {
 // ========== LOAD SEMUA DATA ==========
 async function loadData() {
     try {
+        console.log("📥 Mengambil data users dari Firestore...")
         const usersSnap = await getDocs(collection(db, "users"))
         allUsers = []
         usersSnap.forEach(doc => {
             const data = doc.data()
+            // Ambil semua user kecuali admin
             if (data.role !== 'admin') {
                 allUsers.push({
                     id: doc.id,
@@ -162,15 +152,19 @@ async function loadData() {
                 })
             }
         })
+        console.log(`✅ ${allUsers.length} user berhasil dimuat`)
 
+        console.log("📥 Mengambil data presensi dari Firestore...")
         const presensiSnap = await getDocs(collection(db, "presensi"))
         allPresensi = []
         presensiSnap.forEach(doc => {
             allPresensi.push({ id: doc.id, ...doc.data() })
         })
+        console.log(`✅ ${allPresensi.length} presensi berhasil dimuat`)
 
     } catch (error) {
-        console.error("Error load data:", error)
+        console.error("❌ Error load data:", error)
+        throw error
     }
 }
 
@@ -184,18 +178,34 @@ async function loadFilterOptions() {
             }
         })
 
-        const select = document.getElementById("filterKelurahan")
-        select.innerHTML = '<option value="">Semua Kelurahan</option>'
+        // Isi filter kelurahan untuk harian
+        const selectHarian = document.getElementById("filterKelurahan")
+        if (selectHarian) {
+            selectHarian.innerHTML = '<option value="">Semua Kelurahan</option>'
+            Array.from(kelurahanSet).sort().forEach(kel => {
+                const option = document.createElement("option")
+                option.value = kel
+                option.textContent = kel
+                selectHarian.appendChild(option)
+            })
+        }
 
-        Array.from(kelurahanSet).sort().forEach(kel => {
-            const option = document.createElement("option")
-            option.value = kel
-            option.textContent = kel
-            select.appendChild(option)
-        })
+        // Isi filter kelurahan untuk bulanan
+        const selectBulanan = document.getElementById("filterKelurahanBulanan")
+        if (selectBulanan) {
+            selectBulanan.innerHTML = '<option value="">Semua Kelurahan</option>'
+            Array.from(kelurahanSet).sort().forEach(kel => {
+                const option = document.createElement("option")
+                option.value = kel
+                option.textContent = kel
+                selectBulanan.appendChild(option)
+            })
+        }
+
+        console.log("✅ Filter kelurahan berhasil dimuat:", kelurahanSet.size, "kelurahan")
 
     } catch (error) {
-        console.error("Error load filter:", error)
+        console.error("❌ Error load filter:", error)
     }
 }
 
@@ -211,18 +221,24 @@ function loadRekap() {
 // ========== LOAD REKAP HARIAN ==========
 async function loadRekapHarian() {
     try {
-        const tanggal = document.getElementById("filterTanggal").value
-        const kelurahan = document.getElementById("filterKelurahan").value
+        console.log("📊 Memuat rekap harian...")
+        const tanggal = document.getElementById("filterTanggal")?.value || getTodayLocal()
+        const kelurahan = document.getElementById("filterKelurahan")?.value || ""
 
         currentFilter.tanggal = tanggal
         currentFilter.kelurahan = kelurahan
 
-        document.getElementById("tanggalDisplay").textContent = formatTanggal(tanggal)
+        const tanggalDisplayEl = document.getElementById("tanggalDisplay")
+        if (tanggalDisplayEl) {
+            tanggalDisplayEl.textContent = formatTanggal(tanggal)
+        }
 
         let filteredUsers = allUsers
         if (kelurahan) {
             filteredUsers = allUsers.filter(u => u.kelurahan === kelurahan)
         }
+
+        console.log(`👥 Filtered users: ${filteredUsers.length} (kelurahan: ${kelurahan || 'semua'})`)
 
         const presensiHariIni = allPresensi.filter(p => p.tanggal === tanggal)
         const presensiMap = new Map()
@@ -242,16 +258,26 @@ async function loadRekapHarian() {
 
         const hadir = usersWithStatus.filter(u => u.status === 'Hadir').length
         const total = filteredUsers.length
-        document.getElementById("totalFasilitator").textContent = total
-        document.getElementById("hadirHariIni").textContent = hadir
-        document.getElementById("belumHadir").textContent = total - hadir
-        document.getElementById("persentase").textContent = total > 0 ? Math.round((hadir / total) * 100) + '%' : '0%'
 
+        console.log(`📊 Statistik: ${hadir}/${total} hadir`)
+
+        // Update stat cards
+        const totalFasilitatorEl = document.getElementById("totalFasilitator")
+        const hadirHariIniEl = document.getElementById("hadirHariIni")
+        const belumHadirEl = document.getElementById("belumHadir")
+        const persentaseEl = document.getElementById("persentase")
+
+        if (totalFasilitatorEl) totalFasilitatorEl.textContent = total
+        if (hadirHariIniEl) hadirHariIniEl.textContent = hadir
+        if (belumHadirEl) belumHadirEl.textContent = total - hadir
+        if (persentaseEl) persentaseEl.textContent = total > 0 ? Math.round((hadir / total) * 100) + '%' : '0%'
+
+        // Generate tabel
         let html = ''
         usersWithStatus.forEach((user, index) => {
             const p = user.dataPresensi
             const statusColor = p ? '#27AE60' : '#E74C3C'
-            const waktu = p ? new Date(p.waktu?.seconds * 1000).toLocaleTimeString() : '-'
+            const waktu = p ? new Date(p.waktu?.seconds * 1000).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-'
             const lokasi = p ? (p.lokasi === 'kantor' ? 'Kantor Pusat' : (p.lokasi || '-')) : '-'
 
             let roleBadge = ''
@@ -275,22 +301,32 @@ async function loadRekapHarian() {
             `
         })
 
-        document.getElementById("tableHarian").innerHTML = html || '<tr><td colspan="6" class="text-center">Tidak ada data</td></tr>'
+        const tableHarianEl = document.getElementById("tableHarian")
+        if (tableHarianEl) {
+            tableHarianEl.innerHTML = html || '<tr><td colspan="6" class="text-center">Tidak ada data</td></tr>'
+        }
+
+        console.log("✅ Rekap harian berhasil dimuat")
 
     } catch (error) {
-        console.error("Error load rekap harian:", error)
+        console.error("❌ Error load rekap harian:", error)
+        const tableHarianEl = document.getElementById("tableHarian")
+        if (tableHarianEl) {
+            tableHarianEl.innerHTML = `<tr><td colspan="6" class="text-center" style="color:red;">Gagal memuat: ${error.message}</td></tr>`
+        }
     }
 }
 
 // ========== LOAD REKAP BULANAN ==========
 async function loadRekapBulanan() {
     try {
+        console.log("📊 Memuat rekap bulanan...")
         const filterBulanEl = document.getElementById("filterBulan");
         const filterTahunEl = document.getElementById("filterTahun");
-        const filterKelurahanEl = document.getElementById("filterKelurahan");
+        const filterKelurahanEl = document.getElementById("filterKelurahanBulanan");
 
         if (!filterBulanEl || !filterTahunEl) {
-            console.warn("Elemen filter bulan/tahun belum siap di HTML.");
+            console.warn("⚠️ Elemen filter bulan/tahun tidak ditemukan");
             return;
         }
 
@@ -311,6 +347,8 @@ async function loadRekapBulanan() {
         if (kelurahan) {
             filteredUsers = filteredUsers.filter(u => u.kelurahan === kelurahan);
         }
+
+        console.log(`👥 Filtered users bulanan: ${filteredUsers.length}`)
 
         filteredUsers.sort((a, b) => {
             const isAKoord = a.role === 'koordinator' ? 1 : 0;
@@ -338,6 +376,7 @@ async function loadRekapBulanan() {
             }
         }
 
+        // Generate header dinamis
         const dynamicHeader = document.getElementById("headerBulanan");
         if (dynamicHeader) {
             let headerHtml = '<th>No</th><th>Nama Fasilitator</th><th>Kelurahan</th>';
@@ -350,6 +389,7 @@ async function loadRekapBulanan() {
             dynamicHeader.innerHTML = headerHtml;
         }
 
+        // Mapping presensi
         const presensiMapByUser = {};
         allPresensi.forEach(p => {
             if (p.tanggal && p.uid) {
@@ -391,6 +431,7 @@ async function loadRekapBulanan() {
 
         let html = '';
         let totalHadirSemua = 0;
+        const userStatsForGrafik = [];
 
         filteredUsers.forEach((user, index) => {
             let totalHadirUser = 0;
@@ -422,6 +463,12 @@ async function loadRekapBulanan() {
             totalHadirSemua += totalHadirUser;
             const persentase = totalHariKerjaEfektif > 0 ? Math.round((totalHadirUser / totalHariKerjaEfektif) * 100) : 0;
 
+            userStatsForGrafik.push({
+                ...user,
+                totalHadir: totalHadirUser,
+                persentase: persentase
+            });
+
             let roleBadge = '';
             if (user.role === 'koordinator') {
                 roleBadge = '<span style="background:#F39C12; color:white; padding:2px 4px; border-radius:10px; font-size:9px; margin-left:3px;">📋 K</span>';
@@ -449,6 +496,7 @@ async function loadRekapBulanan() {
             tableBulananEl.innerHTML = html || `<tr><td colspan="${daysInMonth + 6}" class="text-center">Tidak ada data terdeteksi</td></tr>`;
         }
 
+        // Update stat cards bulanan
         const totalUser = filteredUsers.length;
         const rataHadir = totalUser > 0 ? (totalHadirSemua / totalUser).toFixed(1) : 0;
         const persenGlobal = totalHariKerjaEfektif > 0 ? Math.round((rataHadir / totalHariKerjaEfektif) * 100) : 0;
@@ -462,8 +510,16 @@ async function loadRekapBulanan() {
         const persenBulananEl = document.getElementById("persenBulanan");
         if (persenBulananEl) persenBulananEl.textContent = persenGlobal + '%';
 
+        // Render grafik
+        if (userStatsForGrafik.length > 0) {
+            userStatsForGrafik.sort((a, b) => a.totalHadir - b.totalHadir);
+            renderGrafik(userStatsForGrafik.slice(0, 10), totalHariKerjaEfektif);
+        }
+
+        console.log("✅ Rekap bulanan berhasil dimuat")
+
     } catch (error) {
-        console.error("Error load rekap bulanan:", error);
+        console.error("❌ Error load rekap bulanan:", error);
         const tableBulananEl = document.getElementById("tableBulanan");
         if (tableBulananEl) {
             tableBulananEl.innerHTML = `<tr><td colspan="15" style="color:red; text-align:center; font-weight:bold; padding:15px;">⚠️ Gagal mengurai data: ${error.message}</td></tr>`;
@@ -471,239 +527,28 @@ async function loadRekapBulanan() {
     }
 }
 
-// ========== TRIGGER EVENT FILTER ==========
-window.applyFilter = function() {
-    loadRekap()
-}
+// ========== RENDER GRAFIK ==========
+function renderGrafik(users, totalHariKerja) {
+    const container = document.getElementById("grafikContainer")
+    if (!container) return
+    container.innerHTML = ''
 
-window.resetFilter = function() {
-    document.getElementById("filterKelurahan").value = ''
-    document.getElementById("filterTanggal").value = getTodayLocal()
-    document.getElementById("filterBulan").value = new Date().getMonth() + 1
-    document.getElementById("filterTahun").value = new Date().getFullYear()
-    loadRekap()
-}
-
-// ========== FUNGSI EXPORT EXCEL ==========
-window.exportHarian = async function() {
-    const tanggal = document.getElementById("filterTanggal").value
-    const kelurahan = document.getElementById("filterKelurahan").value
-
-    showLoading(true)
-    try {
-        let filteredUsers = allUsers
-        if (kelurahan) {
-            filteredUsers = allUsers.filter(u => u.kelurahan === kelurahan)
-        }
-        filteredUsers.sort((a, b) => {
-            const aKoord = a.role === 'koordinator'
-            const bKoord = b.role === 'koordinator'
-            if (aKoord && !bKoord) return -1
-            if (!aKoord && bKoord) return 1
-            const kelA = (a.kelurahan || '').toUpperCase()
-            const kelB = (b.kelurahan || '').toUpperCase()
-            if (kelA < kelB) return -1
-            if (kelA > kelB) return 1
-            return (a.nama || '').localeCompare(b.nama || '')
-        })
-
-        const presensiHariIni = allPresensi.filter(p => p.tanggal === tanggal)
-        const presensiMap = new Map()
-        presensiHariIni.forEach(p => presensiMap.set(p.uid, p))
-
-        const data = [['No', 'Nama', 'Role', 'Kelurahan', 'Status Kehadiran', 'Waktu Absen', 'Lokasi']]
-
-        let no = 1
-        filteredUsers.forEach(user => {
-            const p = presensiMap.get(user.uid)
-            const status = p ? 'Hadir' : 'Belum Hadir'
-            const waktu = p ? new Date(p.waktu?.seconds * 1000).toLocaleTimeString() : '-'
-            const lokasi = p ? (p.lokasi === 'kantor' ? 'Kantor Pusat' : (p.lokasi || '-')) : '-'
-            const role = user.role === 'koordinator' ? 'Koordinator' : 'Fasilitator'
-
-            data.push([no++, user.nama || '-', role, user.kelurahan || '-', status, waktu, lokasi])
-        })
-
-        const wb = XLSX.utils.book_new()
-        const ws = XLSX.utils.aoa_to_sheet(data)
-        ws['!cols'] = [{ wch: 5 }, { wch: 25 }, { wch: 15 }, { wch: 20 }, { wch: 18 }, { wch: 15 }, { wch: 20 }]
-
-        const fileName = kelurahan ? `Rekap_Harian_${kelurahan}_${tanggal}.xlsx` : `Rekap_Harian_${tanggal}.xlsx`
-        XLSX.utils.book_append_sheet(wb, ws, "Harian")
-        XLSX.writeFile(wb, fileName)
-
-    } catch (error) {
-        console.error("Error export harian:", error)
-        alert("❌ Gagal export harian: " + error.message)
-    } finally {
-        showLoading(false)
+    if (users.length === 0) {
+        container.innerHTML = '<p style="text-align: center; color: #7F8C8D;">Tidak ada data</p>'
+        return
     }
-}
 
-window.exportBulanan = async function() {
-    const bulan = parseInt(document.getElementById("filterBulan").value)
-    const tahun = parseInt(document.getElementById("filterTahun").value)
-    const kelurahan = document.getElementById("filterKelurahan").value
+    users.forEach(user => {
+        const height = totalHariKerja > 0 ? (user.totalHadir / totalHariKerja) * 100 : 0
+        const bar = document.createElement('div')
+        bar.style.flex = '1'
+        bar.style.display = 'flex'
+        bar.style.flexDirection = 'column'
+        bar.style.alignItems = 'center'
+        bar.style.gap = '5px'
 
-    showLoading(true)
-    try {
-        let filteredUsers = allUsers
-        if (kelurahan) {
-            filteredUsers = allUsers.filter(u => u.kelurahan === kelurahan)
-        }
-        filteredUsers.sort((a, b) => {
-            const aKoord = a.role === 'koordinator'
-            const bKoord = b.role === 'koordinator'
-            if (aKoord && !bKoord) return -1
-            if (!aKoord && bKoord) return 1
-            const kelA = (a.kelurahan || '').toUpperCase()
-            const kelB = (b.kelurahan || '').toUpperCase()
-            if (kelA < kelB) return -1
-            if (kelA > kelB) return 1
-            return (a.nama || '').localeCompare(b.nama || '')
-        })
-
-        const daysInMonth = new Date(tahun, bulan, 0).getDate()
-        const strBulan = String(bulan).padStart(2, '0')
-
-        let totalHariKerjaEfektif = 0;
-        for (let d = 1; d <= daysInMonth; d++) {
-            const dayOfWeek = new Date(tahun, bulan - 1, d).getDay();
-            if (dayOfWeek !== 0 && dayOfWeek !== 6) totalHariKerjaEfektif++;
-        }
-
-        const headerRow = ['No', 'Nama Fasilitator', 'Role', 'Kelurahan']
-        for (let d = 1; d <= daysInMonth; d++) {
-            headerRow.push(d)
-        }
-        headerRow.push('Total Hadir', 'Hari Kerja', 'Persentase Kehadiran')
-
-        const excelData = [headerRow]
-
-        const presensiMapByUser = {}
-        allPresensi.forEach(p => {
-            if (p.tanggal) {
-                const pDate = new Date(p.tanggal)
-                if (pDate.getMonth() + 1 === bulan && pDate.getFullYear() === tahun) {
-                    if (!presensiMapByUser[p.uid]) {
-                        presensiMapByUser[p.uid] = {}
-                    }
-                    let jamAbsen = "H"
-                    if (p.waktu?.seconds) {
-                        const waktu = new Date(p.waktu.seconds * 1000)
-                        jamAbsen = waktu.toLocaleTimeString('id-ID', {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                            hour12: false,
-                            timeZone: 'Asia/Jakarta'
-                        }).replace(/\./g, ':')
-                    }
-                    presensiMapByUser[p.uid][p.tanggal] = jamAbsen
-                }
-            }
-        })
-
-        let no = 1
-        filteredUsers.forEach(user => {
-            const role = user.role === 'koordinator' ? 'Koordinator' : 'Fasilitator'
-            const rowData = [no++, user.nama || '-', role, user.kelurahan || '-']
-            let totalHadirUser = 0
-
-            for (let d = 1; d <= daysInMonth; d++) {
-                const strDate = `${tahun}-${strBulan}-${String(d).padStart(2, '0')}`
-                const dayOfWeek = new Date(tahun, bulan - 1, d).getDay()
-                const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6)
-
-                if (isWeekend) {
-                    rowData.push('L')
-                } else {
-                    const jamMasuk = presensiMapByUser[user.uid] && presensiMapByUser[user.uid][strDate]
-                    if (jamMasuk) {
-                        rowData.push(jamMasuk)
-                        totalHadirUser++
-                    } else {
-                        rowData.push('-')
-                    }
-                }
-            }
-
-            const persentase = totalHariKerjaEfektif > 0 ? ((totalHadirUser / totalHariKerjaEfektif) * 100).toFixed(1) + '%' : '0%'
-            rowData.push(totalHadirUser, totalHariKerjaEfektif, persentase)
-            excelData.push(rowData)
-        })
-
-        const wb = XLSX.utils.book_new()
-        const ws = XLSX.utils.aoa_to_sheet(excelData)
-
-        const wscols = [{ wch: 5 }, { wch: 25 }, { wch: 15 }, { wch: 20 }]
-        for (let i = 1; i <= daysInMonth; i++) wscols.push({ wch: 4 })
-        wscols.push({ wch: 12 }, { wch: 12 }, { wch: 20 })
-        ws['!cols'] = wscols
-
-        const namaBulan = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-            'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
-        const fileName = kelurahan
-            ? `Rekap_Bulanan_${kelurahan}_${namaBulan[bulan - 1]}_${tahun}.xlsx`
-            : `Rekap_Bulanan_${namaBulan[bulan - 1]}_${tahun}.xlsx`
-
-        XLSX.utils.book_append_sheet(wb, ws, "Rekap Bulanan Matriks")
-        XLSX.writeFile(wb, fileName)
-
-    } catch (error) {
-        console.error("Error export bulanan:", error)
-        alert("❌ Gagal export bulanan: " + error.message)
-    } finally {
-        showLoading(false)
-    }
-}
-
-// ========== FUNGSI MONITORING STATUS LOKASI ==========
-async function cekStatusLokasiAktif() {
-    const notifEl = document.getElementById("notifikasiStatusLokasi");
-    if (!notifEl) return;
-
-    try {
-        const docSnap = await getDoc(doc(db, "system_settings", "global"));
-
-        if (docSnap.exists()) {
-            const data = docSnap.data();
-            const now = new Date();
-            const start = data.temporaryStart ? new Date(data.temporaryStart) : null;
-            const end = data.temporaryEnd ? new Date(data.temporaryEnd) : null;
-
-            const isCustomActive =
-                data.statusLokasi === "custom" &&
-                data.temporaryLocationEnabled &&
-                start && end &&
-                now >= start &&
-                now <= end;
-
-            notifEl.style.display = "block";
-
-            if (isCustomActive) {
-                notifEl.innerHTML = `
-                    <div style="background-color: #F5EEF8; color: #6C3483; border: 1px solid #D7BDE2; padding: 12px 15px; border-radius: 8px; font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); margin-bottom: 15px;">
-                        <span style="font-size: 16px;">🟣</span> 
-                        <span><strong>Status Wilayah:</strong> <strong>Lokasi Custom ("${data.temporaryLocationName}")</strong> sedang diaktifkan oleh Pusat untuk radius ${data.temporaryRadius} meter.</span>
-                    </div>
-                `;
-            } else {
-                notifEl.innerHTML = `
-                    <div style="background-color: #E8F8F5; color: #117864; border: 1px solid #A3E4D7; padding: 12px 15px; border-radius: 8px; font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); margin-bottom: 15px;">
-                        <span style="font-size: 16px;">🟢</span> 
-                        <span><strong>Status Wilayah:</strong> Sistem berjalan normal. <strong>Lokasi Default (Kantor/Kelurahan)</strong> digunakan.</span>
-                    </div>
-                `;
-            }
-        } else {
-            notifEl.style.display = "block";
-            notifEl.innerHTML = `
-                <div style="background-color: #E8F8F5; color: #117864; border: 1px solid #A3E4D7; padding: 12px 15px; border-radius: 8px; font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
-                    <span>🟢</span> <span><strong>Status Wilayah:</strong> <strong>Lokasi Default digunakan</strong>.</span>
-                </div>
-            `;
-        }
-    } catch (error) {
-        console.error("Gagal memeriksa status lokasi:", error);
-    }
-}
+        bar.innerHTML = `
+            <div style="height: 150px; width: 100%; display: flex; align-items: flex-end;">
+                <div style="height: ${height}%; width: 100%; background: ${user.persentase > 75 ? '#27AE60' : (user.persentase > 50 ? '#F39C12' : '#E74C3C')}; border-radius: 5px 5px 0 0;"></div>
+            </div>
+            <div style="font-size: 10px; text-align: center; white
