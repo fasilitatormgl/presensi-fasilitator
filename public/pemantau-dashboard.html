@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Koordinator - Absensi Fasilitator</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <div class="logo">MGL<span>Koordinator</span></div>
+            <div class="header-right">
+                <div class="status-badge" id="statusBadge">⏳ Memuat...</div>
+                <button class="btn-logout" id="logoutBtn">
+                    <span>🚪</span>
+                    <span class="logout-text">Keluar</span>
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="greeting-card">
+        <div class="greeting-avatar" id="avatar">👤</div>
+        <div class="greeting-text">
+            <div class="greeting-hello">Halo, Koordinator</div>
+            <div class="greeting-name" id="userName">Koordinator</div>
+            <div class="greeting-role" id="userRole">Koordinator Fasilitator</div>
+            <div id="notifikasiStatusLokasi" style="margin: 15px 0; display: none;"></div>
+        </div>
+    </div>
+    
+    <div style="display: flex; margin: 10px; gap: 10px;">
+        <button class="btn-filter" id="tabAbsensi" style="flex: 1; background: #EE2737;" onclick="showTab('absensi')">📍 Absensi</button>
+        <button class="btn-filter" id="tabRekap" style="flex: 1; background: #3498DB;" onclick="showTab('rekap')">📊 Rekap</button>
+    </div>
+    
+    <div id="tabAbsensiContent">
+        <div class="card">
+            <div class="card-title">
+                <span class="card-icon">📋</span>
+                <h3>Status Presensi Hari Ini</h3>
+            </div>
+            <div class="status-container">
+                <div class="status-icon" id="statusEmoji">⏰</div>
+                <div class="status-text" id="statusText">Memuat status...</div>
+                <div class="status-time" id="presensiTime"></div>
+                <button class="btn-presensi" id="btnPresensi">
+                    <span>📍</span> Presensi Sekarang
+                </button>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-title">
+                <span class="card-icon">🗺️</span>
+                <h3>Lokasi Anda</h3>
+            </div>
+            <div class="map-wrapper">
+                <div id="map" class="map-container-small"></div>
+                <div class="map-legend">
+                    <div class="legend-item">
+                        <div class="legend-dot user"></div>
+                        <span>Lokasi Anda</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-title">
+                <span class="card-icon">📍</span>
+                <h3>Info Presensi</h3>
+            </div>
+            <div style="padding: 15px; background: #FFF5F5; border-radius: 8px; border-left: 4px solid #F39C12;">
+                <p><strong>📋 Jika ada Error:</strong></p>
+                <p>✅ Cek lokasi HP dan browser yang digunakan. Jika masih error, bersihkan riwayat data penjelajahan (*clear browsing data*).</p>
+                <p>✅ Minimal radius 100 meter dari kantor atau kelurahan pilihan.</p>
+                <p>✅ Cukup klik tombol "Presensi Sekarang".</p>
+            </div>
+        </div>
+    </div>
+    
+    <div id="tabRekapContent" style="display: none;">
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value" id="totalFasilitator">0</div>
+                <div class="stat-label">Total Fasilitator</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="hadirHariIni">0</div>
+                <div class="stat-label">Hadir Hari Ini</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="belumHadir">0</div>
+                <div class="stat-label">Belum Hadir</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="persentase">0%</div>
+                <div class="stat-label">Kehadiran</div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-title">
+                <span class="card-icon">🔍</span>
+                <h3>Filter Rekap</h3>
+            </div>
+            
+            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                <button class="btn-filter" id="btnHarian" onclick="setMode('harian')" style="flex: 1; background: #EE2737;">📅 Harian</button>
+                <button class="btn-filter" id="btnBulanan" onclick="setMode('bulanan')" style="flex: 1; background: #3498DB;">📊 Bulanan</button>
+            </div>
+            
+            <div class="filter-group" style="margin-bottom: 10px;">
+                <select id="filterKelurahan" class="filter-select">
+                    <option value="">Semua Kelurahan</option>
+                </select>
+            </div>
+            
+            <div id="filterHarian">
+                <div class="filter-group">
+                    <input type="date" id="filterTanggal" class="filter-date">
+                    <button class="btn-filter" onclick="applyFilter()" style="background: #27AE60;">Terapkan</button>
+                    <button class="btn-reset" onclick="resetFilter()">Reset</button>
+                </div>
+            </div>
+            
+            <div id="filterBulanan" style="display: none;">
+                <div class="filter-group">
+                    <select id="filterBulan" class="filter-select">
+                        <option value="1">Januari</option>
+                        <option value="2">Februari</option>
+                        <option value="3">Maret</option>
+                        <option value="4">April</option>
+                        <option value="5">Mei</option>
+                        <option value="6">Juni</option>
+                        <option value="7">Juli</option>
+                        <option value="8">Agustus</option>
+                        <option value="9">September</option>
+                        <option value="10">Oktober</option>
+                        <option value="11">November</option>
+                        <option value="12">Desember</option>
+                    </select>
+                    <select id="filterTahun" class="filter-select">
+                        <option value="2026">2026</option>
+                        <option value="2027">2027</option>
+                    </select>
+                    <button class="btn-filter" onclick="applyFilter()" style="background: #27AE60;">Terapkan</button>
+                    <button class="btn-reset" onclick="resetFilter()">Reset</button>
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-top: 15px;">
+                <button class="btn-success" onclick="exportHarian()" style="flex: 1; background: #27AE60;">
+                    📥 Export Harian
+                </button>
+                <button class="btn-success" onclick="exportBulanan()" style="flex: 1; background: #27AE60;">
+                    📊 Export Bulanan
+                </button>
+            </div>
+        </div>
+        
+        <div class="card" id="rekapHarian">
+            <div class="card-title">
+                <span class="card-icon">📋</span>
+                <h3>Rekap Harian</h3>
+                <span id="tanggalDisplay" style="margin-left: auto; font-size: 12px;"></span>
+            </div>
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>No</th>
+                            <th>Nama</th>
+                            <th>Kelurahan</th>
+                            <th>Status</th>
+                            <th>Waktu</th>
+                            <th>Lokasi</th>
+                            <th>Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableHarian">
+                        <tr><td colspan="7" class="text-center">Memuat data...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <div class="card" id="rekapBulanan" style="display: none;">
+            <div class="card-title">
+                <span class="card-icon">📊</span>
+                <h3>Rekap Bulanan</h3>
+                <span id="bulanDisplay" style="margin-left: auto; font-size: 12px;"></span>
+            </div>
+            
+            <div style="display: flex; gap: 15px; margin-bottom: 15px;">
+                <div class="stat-card" style="flex:1;">
+                    <div class="stat-value" id="totalHari">0</div>
+                    <div class="stat-label">Total Hari Kerja</div>
+                </div>
+                <div class="stat-card" style="flex:1;">
+                    <div class="stat-value" id="rataHadir">0</div>
+                    <div class="stat-label">Rata-rata Hadir</div>
+                </div>
+                <div class="stat-card" style="flex:1;">
+                    <div class="stat-value" id="persenBulanan">0%</div>
+                    <div class="stat-label">Kehadiran</div>
+                </div>
+            </div>
+            
+            <div class="table-responsive" style="overflow-x: auto; width: 100%;">
+                <table class="data-table" style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr id="headerBulanan">
+                            <th>No</th>
+                            <th>Nama</th>
+                            <th>Kelurahan</th>
+                            <th>Hadir</th>
+                            <th>Total Hari</th>
+                            <th>Persentase</th>
+                            <th>Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBulanan">
+                        <tr><td colspan="7" class="text-center">Memuat data...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <div style="margin-top: 20px;">
+                <h4>📈 Grafik Kehadiran (10 Terbawah)</h4>
+                <div id="grafikContainer" style="height: 220px; display: flex; align-items: flex-end; gap: 8px; margin-top: 15px; padding-bottom: 20px; border-bottom: 1px solid #EEE;"></div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="loading-overlay" id="loading">
+        <div class="loading-spinner"></div>
+    </div>
+    
+    <div class="modal" id="errorModal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-icon">⚠️</div>
+            <h3 class="modal-title">Terjadi Kesalahan</h3>
+            <p class="modal-message" id="errorMessage"></p>
+            <button class="modal-button" onclick="closeErrorModal()">Tutup</button>
+        </div>
+    </div>
+    
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+    <script type="module" src="js/koordinator-dashboard.js"></script>
+</body>
+</html>
