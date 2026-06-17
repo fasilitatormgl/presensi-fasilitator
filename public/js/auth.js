@@ -75,14 +75,17 @@ window.login = async function() {
             
             // REDIRECT BERDASARKAN ROLE (Menggunakan replace agar history login hancur & anti-loop)
             if (userData.role === "admin") {
-                window.location.replace("admin.html");
-            } 
-            else if (userData.role === "koordinator") {
-                window.location.replace("koordinator-dashboard.html"); 
-            } 
-            else {
-                window.location.replace("dashboard.html");
+            window.location.replace("admin.html");
             }
+            else if (userData.role === "koordinator") {
+            window.location.replace("koordinator-dashboard.html");
+            }
+            else if (userData.role === "pemantau") {
+            window.location.replace("pemantau-dashboard.html");
+            }
+else {
+    window.location.replace("dashboard.html");
+}
         } else {
             alert("Data user tidak ditemukan di database! Hubungi admin.");
             await auth.signOut();
@@ -155,12 +158,17 @@ onAuthStateChanged(auth, async (user) => {
                     console.log("🔄 Auto redirect aktif, role:", role);
                     
                     if (role === 'admin') {
-                        window.location.replace('admin.html');
-                    } else if (role === 'koordinator') {
-                        window.location.replace('koordinator-dashboard.html');
-                    } else {
-                        window.location.replace('dashboard.html');
-                    }
+                    window.location.replace('admin.html');
+                }
+                    else if (role === 'koordinator') {
+                    window.location.replace('koordinator-dashboard.html');
+                }
+                    else if (role === 'pemantau') {
+                    window.location.replace('pemantau-dashboard.html');
+                }
+                    else {
+                    window.location.replace('dashboard.html');
+                }
                 }
             } catch (err) {
                 console.error("Gagal memproses auto-redirect:", err);
