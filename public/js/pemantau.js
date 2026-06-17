@@ -165,7 +165,8 @@ async function loadData() {
         allUsers = []
         usersSnap.forEach(doc => {
             const data = doc.data()
-            if (data.role !== 'admin') {
+            if (    data.role === "fasilitator" ||
+    data.role === "koordinator") {
                 allUsers.push({ 
                     id: doc.id,
                     uid: data.uid || doc.id,
