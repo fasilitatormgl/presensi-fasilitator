@@ -1,8 +1,7 @@
 import { auth, db } from "./firebase-init.js"
-import { collection, addDoc, query, where, getDocs, getDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js"
+import { collection, getDocs, getDoc, doc } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js"
 import { signOut } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js"
-import { initMap, addMarker } from "./map.js"
-import { resetUserDevice } from "./device.js"
+
 
 // ========== FUNGSI FORMAT TANGGAL LOKAL ==========
 function getTodayLocal() {
@@ -77,17 +76,17 @@ function formatBulan(bulan, tahun) {
 // ========== SWITCH TAB ==========
 window.showTab = function(tab) {
     if (tab === 'absensi') {
-        document.getElementById('tabAbsensiContent').style.display = 'block'
+       
         document.getElementById('tabRekapContent').style.display = 'none'
-        document.getElementById('tabAbsensi').style.background = '#EE2737'
+       
         document.getElementById('tabRekap').style.background = '#3498DB'
         setTimeout(() => {
             if (map) map.invalidateSize()
         }, 200)
     } else {
-        document.getElementById('tabAbsensiContent').style.display = 'none'
+        
         document.getElementById('tabRekapContent').style.display = 'block'
-        document.getElementById('tabAbsensi').style.background = '#3498DB'
+        
         document.getElementById('tabRekap').style.background = '#EE2737'
         loadRekap()
     }
@@ -126,14 +125,14 @@ window.addEventListener('load', async () => {
             userData = JSON.parse(storedData)
         }
         
-        if (!userData || userData.role !== 'koordinator') {
+        if (!userData || userData.role !== 'pemantau') {
             window.location.href = "index.html"
             return
         }
         
-        document.getElementById("userName").textContent = userData.nama || "Koordinator"
+        document.getElementById("userName").textContent = userData.nama || "pemantau"
         document.getElementById("avatar").textContent = (userData.nama || "K").charAt(0).toUpperCase()
-        document.getElementById("userRole").textContent = "Koordinator - Fasilitator"
+        document.getElementById("userRole").textContent = "pemantau - Fasilitator"
         
         const logoutBtn = document.getElementById("logoutBtn")
         if (logoutBtn) logoutBtn.addEventListener("click", logout)
@@ -147,7 +146,7 @@ window.addEventListener('load', async () => {
         
         await loadData()
         await loadFilterOptions()
-        await getLokasiUser()
+ 
         await cekStatusPresensi()
         await loadRekapHarian()
         
@@ -211,132 +210,6 @@ async function loadFilterOptions() {
     }
 }
 
-// ========== DAPATKAN LOKASI USER ==========
-function getLokasiUser() {
-    return new Promise((resolve, reject) => {
-        if (!navigator.geolocation) {
-            showError("Browser tidak mendukung geolocation")
-            reject()
-            return
-        }
-        
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                latUser = position.coords.latitude
-                lngUser = position.coords.longitude
-                setTimeout(() => initMapWithLocations(), 500)
-                resolve()
-            },
-            (error) => {
-                console.error("Error getting location:", error)
-                showError("Gagal mendapatkan lokasi. Pastikan GPS aktif.")
-                reject()
-            },
-            { enableHighAccuracy: true, timeout: 10000 }
-        )
-    })
-}
-
-// ========== INIT MAP ==========
-function initMapWithLocations() {
-    const mapElement = document.getElementById('map')
-    if (!mapElement || !latUser || !lngUser) return
-    
-    try {
-        if (map) map.remove()
-        map = initMap('map', latUser, lngUser, 16)
-        if (!map) return
-        userMarker = addMarker(map, latUser, lngUser, 'Lokasi Anda', 'user')
-        setTimeout(() => map.invalidateSize(), 300)
-    } catch (error) {
-        console.error("Error init map:", error)
-    }
-}
-
-// ========== CEK STATUS PRESENSI KOORDINATOR ==========
-async function cekStatusPresensi() {
-    const today = getTodayLocal();
-    
-    // Gunakan array lokal allPresensi agar tidak memboroskan query Firestore
-    const dataExist = allPresensi.find(p => p.uid === userData.uid && p.tanggal === today)
-    
-    const btnPresensi = document.getElementById("btnPresensi")
-    const statusBadge = document.getElementById("statusBadge")
-    const statusEmoji = document.getElementById("statusEmoji")
-    const statusText = document.getElementById("statusText")
-    const presensiTime = document.getElementById("presensiTime")
-    
-    if (dataExist) {
-        const waktu = dataExist.waktu?.seconds ? new Date(dataExist.waktu.seconds * 1000) : new Date()
-        
-        if (statusBadge) statusBadge.innerHTML = '✓ Hadir'
-        if (statusEmoji) statusEmoji.textContent = '✅'
-        if (statusText) statusText.textContent = 'Koordinator - sudah presensi'
-        if (presensiTime) presensiTime.textContent = `Pukul: ${waktu.toLocaleTimeString()} (Lokasi)`
-        
-        if (btnPresensi) {
-            btnPresensi.disabled = true
-            btnPresensi.innerHTML = '<span>✅</span> Sudah Presensi'
-        }
-    } else {
-        if (statusBadge) statusBadge.innerHTML = '○ Belum'
-        if (statusEmoji) statusEmoji.textContent = '⏰'
-        if (statusText) statusText.textContent = 'Koordinator - Fasilitator'
-        if (presensiTime) presensiTime.textContent = ''
-        
-        if (btnPresensi) {
-            btnPresensi.disabled = false
-            btnPresensi.innerHTML = '<span>📍</span> Presensi Sekarang'
-            btnPresensi.onclick = presensi
-        }
-    }
-}
-
-// ========== PRESENSI KOORDINATOR ==========
-async function presensi() {
-    showLoading(true)
-    
-    try {
-        if (!latUser || !lngUser) {
-            showError("Gagal mendapatkan lokasi! Pastikan GPS aktif.")
-            return
-        }
-        
-        const today = getTodayLocal();
-        
-        const q = query(
-            collection(db, "presensi"),
-            where("uid", "==", userData.uid),
-            where("tanggal", "==", today)
-        )
-        
-        const cek = await getDocs(q)
-        if (!cek.empty) {
-            showError("Hari ini sudah presensi!")
-            return
-        }
-        
-        await addDoc(collection(db, "presensi"), {
-            uid: userData.uid,
-            nama: userData.nama,
-            tanggal: today,
-            lat: latUser,
-            lng: lngUser,
-            lokasi: "koordinator",
-            waktu: new Date(),
-            deviceId: localStorage.getItem("deviceId")
-        })
-        
-        alert("✅ Presensi koordinator berhasil!")
-        window.location.reload()
-        
-    } catch (error) {
-        console.error("Error presensi:", error)
-        showError("Gagal presensi: " + error.message)
-    } finally {
-        showLoading(false)
-    }
-}
 
 // ========== LOAD REKAP (SWITCH MODE) ==========
 function loadRekap() {
@@ -395,7 +268,7 @@ async function loadRekapHarian() {
             const lokasi = p ? (p.lokasi === 'kantor' ? 'Kantor Pusat' : (p.lokasi || '-')) : '-'
             
             let roleBadge = ''
-            if (user.role === 'koordinator') {
+            if (user.role === 'pemantau') {
                 roleBadge = '<span style="background:#F39C12; color:white; padding:2px 6px; border-radius:10px; font-size:10px; margin-left:5px;">📋 Koord</span>'
             }
             
@@ -948,58 +821,4 @@ for (let i = 0; i < 500; i++) {
 // PASTE KODE INI DI BARIS PALING BAWAH FILE
 // ==========================================================
 
-// === FUNGSI MONITORING STATUS LOKASI DARI ADMIN ===
-async function cekStatusLokasiAktif() {
-    const notifEl = document.getElementById("notifikasiStatusLokasi");
-    if (!notifEl) return;
 
-    try {
-        const docSnap = await getDoc(doc(db, "system_settings", "global"));
-        
-        if (docSnap.exists()) {
-            const data = docSnap.data();
-            const now = new Date();
-            const start = data.temporaryStart ? new Date(data.temporaryStart) : null;
-            const end = data.temporaryEnd ? new Date(data.temporaryEnd) : null;
-
-            const isCustomActive = 
-                data.statusLokasi === "custom" && 
-                data.temporaryLocationEnabled &&
-                start && end && 
-                now >= start && 
-                now <= end;
-
-            notifEl.style.display = "block";
-
-            if (isCustomActive) {
-                notifEl.innerHTML = `
-                    <div style="background-color: #F5EEF8; color: #6C3483; border: 1px solid #D7BDE2; padding: 12px 15px; border-radius: 8px; font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); margin-bottom: 15px;">
-                        <span style="font-size: 16px;">🟣</span> 
-                        <span><strong>Status Wilayah:</strong> <strong>Lokasi Custom ("${data.temporaryLocationName}")</strong> sedang diaktifkan oleh Pusat untuk radius ${data.temporaryRadius} meter.</span>
-                    </div>
-                `;
-            } else {
-                notifEl.innerHTML = `
-                    <div style="background-color: #E8F8F5; color: #117864; border: 1px solid #A3E4D7; padding: 12px 15px; border-radius: 8px; font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); margin-bottom: 15px;">
-                        <span style="font-size: 16px;">🟢</span> 
-                        <span><strong>Status Wilayah:</strong> Sistem berjalan normal. <strong>Lokasi Default (Kantor/Kelurahan)</strong> digunakan.</span>
-                    </div>
-                `;
-            }
-        } else {
-            notifEl.style.display = "block";
-            notifEl.innerHTML = `
-                <div style="background-color: #E8F8F5; color: #117864; border: 1px solid #A3E4D7; padding: 12px 15px; border-radius: 8px; font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
-                    <span>🟢</span> <span><strong>Status Wilayah:</strong> <strong>Lokasi Default digunakan</strong>.</span>
-                </div>
-            `;
-        }
-    } catch (error) {
-        console.error("Gagal memeriksa status lokasi dari admin:", error);
-    }
-}
-
-// Jalankan fungsi setelah halaman koordinator selesai dimuat sepenuhnya
-window.addEventListener('load', () => {
-    cekStatusLokasiAktif();
-});
