@@ -551,4 +551,260 @@ function renderGrafik(users, totalHariKerja) {
             <div style="height: 150px; width: 100%; display: flex; align-items: flex-end;">
                 <div style="height: ${height}%; width: 100%; background: ${user.persentase > 75 ? '#27AE60' : (user.persentase > 50 ? '#F39C12' : '#E74C3C')}; border-radius: 5px 5px 0 0;"></div>
             </div>
-            <div style="font-size: 10px; text-align: center; white
+            <div style="font-size: 10px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 80px;" title="${user.nama}">
+                ${user.nama?.split(' ')[0] || '-'}
+            </div>
+        `
+        container.appendChild(bar)
+    })
+}
+
+// ========== TRIGGER EVENT FILTER ==========
+window.applyFilter = function() {
+    if (currentMode === 'harian') {
+        loadRekapHarian()
+    } else {
+        loadRekapBulanan()
+    }
+}
+
+window.resetFilter = function() {
+    document.getElementById("filterKelurahan").value = ''
+    document.getElementById("filterKelurahanBulanan").value = ''
+    document.getElementById("filterTanggal").value = getTodayLocal()
+    document.getElementById("filterBulan").value = new Date().getMonth() + 1
+    document.getElementById("filterTahun").value = new Date().getFullYear()
+    
+    if (currentMode === 'harian') {
+        loadRekapHarian()
+    } else {
+        loadRekapBulanan()
+    }
+}
+
+// ========== FUNGSI EXPORT EXCEL ==========
+window.exportHarian = async function() {
+    const tanggal = document.getElementById("filterTanggal").value
+    const kelurahan = document.getElementById("filterKelurahan").value
+
+    showLoading(true)
+    try {
+        let filteredUsers = allUsers
+        if (kelurahan) {
+            filteredUsers = allUsers.filter(u => u.kelurahan === kelurahan)
+        }
+        filteredUsers.sort((a, b) => {
+            const aKoord = a.role === 'koordinator'
+            const bKoord = b.role === 'koordinator'
+            if (aKoord && !bKoord) return -1
+            if (!aKoord && bKoord) return 1
+            const kelA = (a.kelurahan || '').toUpperCase()
+            const kelB = (b.kelurahan || '').toUpperCase()
+            if (kelA < kelB) return -1
+            if (kelA > kelB) return 1
+            return (a.nama || '').localeCompare(b.nama || '')
+        })
+
+        const presensiHariIni = allPresensi.filter(p => p.tanggal === tanggal)
+        const presensiMap = new Map()
+        presensiHariIni.forEach(p => presensiMap.set(p.uid, p))
+
+        const data = [['No', 'Nama', 'Role', 'Kelurahan', 'Status Kehadiran', 'Waktu Absen', 'Lokasi']]
+
+        let no = 1
+        filteredUsers.forEach(user => {
+            const p = presensiMap.get(user.uid)
+            const status = p ? 'Hadir' : 'Belum Hadir'
+            const waktu = p ? new Date(p.waktu?.seconds * 1000).toLocaleTimeString() : '-'
+            const lokasi = p ? (p.lokasi === 'kantor' ? 'Kantor Pusat' : (p.lokasi || '-')) : '-'
+            const role = user.role === 'koordinator' ? 'Koordinator' : 'Fasilitator'
+
+            data.push([no++, user.nama || '-', role, user.kelurahan || '-', status, waktu, lokasi])
+        })
+
+        const wb = XLSX.utils.book_new()
+        const ws = XLSX.utils.aoa_to_sheet(data)
+        ws['!cols'] = [{ wch: 5 }, { wch: 25 }, { wch: 15 }, { wch: 20 }, { wch: 18 }, { wch: 15 }, { wch: 20 }]
+
+        const fileName = kelurahan ? `Rekap_Harian_${kelurahan}_${tanggal}.xlsx` : `Rekap_Harian_${tanggal}.xlsx`
+        XLSX.utils.book_append_sheet(wb, ws, "Harian")
+        XLSX.writeFile(wb, fileName)
+
+    } catch (error) {
+        console.error("Error export harian:", error)
+        alert("❌ Gagal export harian: " + error.message)
+    } finally {
+        showLoading(false)
+    }
+}
+
+window.exportBulanan = async function() {
+    const bulan = parseInt(document.getElementById("filterBulan").value)
+    const tahun = parseInt(document.getElementById("filterTahun").value)
+    const kelurahan = document.getElementById("filterKelurahanBulanan").value
+
+    showLoading(true)
+    try {
+        let filteredUsers = allUsers
+        if (kelurahan) {
+            filteredUsers = allUsers.filter(u => u.kelurahan === kelurahan)
+        }
+        filteredUsers.sort((a, b) => {
+            const aKoord = a.role === 'koordinator'
+            const bKoord = b.role === 'koordinator'
+            if (aKoord && !bKoord) return -1
+            if (!aKoord && bKoord) return 1
+            const kelA = (a.kelurahan || '').toUpperCase()
+            const kelB = (b.kelurahan || '').toUpperCase()
+            if (kelA < kelB) return -1
+            if (kelA > kelB) return 1
+            return (a.nama || '').localeCompare(b.nama || '')
+        })
+
+        const daysInMonth = new Date(tahun, bulan, 0).getDate()
+        const strBulan = String(bulan).padStart(2, '0')
+
+        let totalHariKerjaEfektif = 0;
+        for (let d = 1; d <= daysInMonth; d++) {
+            const dayOfWeek = new Date(tahun, bulan - 1, d).getDay();
+            if (dayOfWeek !== 0 && dayOfWeek !== 6) totalHariKerjaEfektif++;
+        }
+
+        const headerRow = ['No', 'Nama Fasilitator', 'Role', 'Kelurahan']
+        for (let d = 1; d <= daysInMonth; d++) {
+            headerRow.push(d)
+        }
+        headerRow.push('Total Hadir', 'Hari Kerja', 'Persentase Kehadiran')
+
+        const excelData = [headerRow]
+
+        const presensiMapByUser = {}
+        allPresensi.forEach(p => {
+            if (p.tanggal) {
+                const pDate = new Date(p.tanggal)
+                if (pDate.getMonth() + 1 === bulan && pDate.getFullYear() === tahun) {
+                    if (!presensiMapByUser[p.uid]) {
+                        presensiMapByUser[p.uid] = {}
+                    }
+                    let jamAbsen = "H"
+                    if (p.waktu?.seconds) {
+                        const waktu = new Date(p.waktu.seconds * 1000)
+                        jamAbsen = waktu.toLocaleTimeString('id-ID', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            hour12: false,
+                            timeZone: 'Asia/Jakarta'
+                        }).replace(/\./g, ':')
+                    }
+                    presensiMapByUser[p.uid][p.tanggal] = jamAbsen
+                }
+            }
+        })
+
+        let no = 1
+        filteredUsers.forEach(user => {
+            const role = user.role === 'koordinator' ? 'Koordinator' : 'Fasilitator'
+            const rowData = [no++, user.nama || '-', role, user.kelurahan || '-']
+            let totalHadirUser = 0
+
+            for (let d = 1; d <= daysInMonth; d++) {
+                const strDate = `${tahun}-${strBulan}-${String(d).padStart(2, '0')}`
+                const dayOfWeek = new Date(tahun, bulan - 1, d).getDay()
+                const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6)
+
+                if (isWeekend) {
+                    rowData.push('L')
+                } else {
+                    const jamMasuk = presensiMapByUser[user.uid] && presensiMapByUser[user.uid][strDate]
+                    if (jamMasuk) {
+                        rowData.push(jamMasuk)
+                        totalHadirUser++
+                    } else {
+                        rowData.push('-')
+                    }
+                }
+            }
+
+            const persentase = totalHariKerjaEfektif > 0 ? ((totalHadirUser / totalHariKerjaEfektif) * 100).toFixed(1) + '%' : '0%'
+            rowData.push(totalHadirUser, totalHariKerjaEfektif, persentase)
+            excelData.push(rowData)
+        })
+
+        const wb = XLSX.utils.book_new()
+        const ws = XLSX.utils.aoa_to_sheet(excelData)
+
+        const wscols = [{ wch: 5 }, { wch: 25 }, { wch: 15 }, { wch: 20 }]
+        for (let i = 1; i <= daysInMonth; i++) wscols.push({ wch: 4 })
+        wscols.push({ wch: 12 }, { wch: 12 }, { wch: 20 })
+        ws['!cols'] = wscols
+
+        const namaBulan = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+            'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
+        const fileName = kelurahan
+            ? `Rekap_Bulanan_${kelurahan}_${namaBulan[bulan - 1]}_${tahun}.xlsx`
+            : `Rekap_Bulanan_${namaBulan[bulan - 1]}_${tahun}.xlsx`
+
+        XLSX.utils.book_append_sheet(wb, ws, "Rekap Bulanan Matriks")
+        XLSX.writeFile(wb, fileName)
+
+    } catch (error) {
+        console.error("Error export bulanan:", error)
+        alert("❌ Gagal export bulanan: " + error.message)
+    } finally {
+        showLoading(false)
+    }
+}
+
+// ========== FUNGSI MONITORING STATUS LOKASI ==========
+async function cekStatusLokasiAktif() {
+    const notifEl = document.getElementById("notifikasiStatusLokasi");
+    if (!notifEl) return;
+
+    try {
+        const docSnap = await getDoc(doc(db, "system_settings", "global"));
+
+        if (docSnap.exists()) {
+            const data = docSnap.data();
+            const now = new Date();
+            const start = data.temporaryStart ? new Date(data.temporaryStart) : null;
+            const end = data.temporaryEnd ? new Date(data.temporaryEnd) : null;
+
+            const isCustomActive =
+                data.statusLokasi === "custom" &&
+                data.temporaryLocationEnabled &&
+                start && end &&
+                now >= start &&
+                now <= end;
+
+            notifEl.style.display = "block";
+
+            if (isCustomActive) {
+                notifEl.innerHTML = `
+                    <div style="background-color: #F5EEF8; color: #6C3483; border: 1px solid #D7BDE2; padding: 12px 15px; border-radius: 8px; font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); margin-bottom: 15px;">
+                        <span style="font-size: 16px;">🟣</span> 
+                        <span><strong>Status Wilayah:</strong> <strong>Lokasi Custom ("${data.temporaryLocationName}")</strong> sedang diaktifkan oleh Pusat untuk radius ${data.temporaryRadius} meter.</span>
+                    </div>
+                `;
+            } else {
+                notifEl.innerHTML = `
+                    <div style="background-color: #E8F8F5; color: #117864; border: 1px solid #A3E4D7; padding: 12px 15px; border-radius: 8px; font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); margin-bottom: 15px;">
+                        <span style="font-size: 16px;">🟢</span> 
+                        <span><strong>Status Wilayah:</strong> Sistem berjalan normal. <strong>Lokasi Default (Kantor/Kelurahan)</strong> digunakan.</span>
+                    </div>
+                `;
+            }
+        } else {
+            notifEl.style.display = "block";
+            notifEl.innerHTML = `
+                <div style="background-color: #E8F8F5; color: #117864; border: 1px solid #A3E4D7; padding: 12px 15px; border-radius: 8px; font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
+                    <span>🟢</span> <span><strong>Status Wilayah:</strong> <strong>Lokasi Default digunakan</strong>.</span>
+                </div>
+            `;
+        }
+    } catch (error) {
+        console.error("Gagal memeriksa status lokasi:", error);
+    }
+}
+
+// Export semua fungsi yang diperlukan ke window
+console.log("✅ pemantau.js berhasil dimuat dan siap digunakan");
