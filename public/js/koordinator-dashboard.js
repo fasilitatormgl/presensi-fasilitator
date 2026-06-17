@@ -153,7 +153,7 @@ window.addEventListener('load', async () => {
         
     } catch (error) {
         console.error("Error:", error)
-        showError("Gagal memuat dashboard")
+        showError("Gagal memuat dashboard pastikan lokasi aktif")
     } finally {
         showLoading(false)
     }
