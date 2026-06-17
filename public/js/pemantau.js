@@ -2,20 +2,9 @@ import { auth, db } from "./firebase-init.js"
 import { collection, getDocs, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js"
 import { signOut } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js"
 
-// ========== FUNGSI FORMAT TANGGAL LOKAL ==========
-function getTodayLocal() {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-}
-
 // ========== VARIABEL GLOBAL ==========
 let userData = {}
-let currentMode = 'harian'
 let currentFilter = {
-    tanggal: getTodayLocal(),
     bulan: new Date().getMonth() + 1,
     tahun: new Date().getFullYear(),
     kelurahan: ''
@@ -55,51 +44,25 @@ window.closeErrorModal = function() {
     if (modal) modal.style.display = "none"
 }
 
-// ========== FORMAT TANGGAL & BULAN ==========
-function formatTanggal(date) {
-    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }
-    return new Date(date).toLocaleDateString('id-ID', options)
-}
-
+// ========== FORMAT BULAN ==========
 function formatBulan(bulan, tahun) {
     const namaBulan = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
         'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
     return `${namaBulan[bulan - 1]} ${tahun}`
 }
 
-// ========== SWITCH TAB ==========
-window.showTab = function(tab) {
-    if (tab === 'harian') {
-        document.getElementById('tabHarianContent').style.display = 'block'
-        document.getElementById('tabBulananContent').style.display = 'none'
-        document.getElementById('tabHarian').style.background = '#EE2737'
-        document.getElementById('tabBulanan').style.background = '#3498DB'
-        currentMode = 'harian'
-        loadRekapHarian()
-    } else {
-        document.getElementById('tabHarianContent').style.display = 'none'
-        document.getElementById('tabBulananContent').style.display = 'block'
-        document.getElementById('tabHarian').style.background = '#3498DB'
-        document.getElementById('tabBulanan').style.background = '#EE2737'
-        currentMode = 'bulanan'
-        loadRekapBulanan()
-    }
-}
-
 // ========== INIT DASHBOARD ==========
 window.addEventListener('load', async () => {
     showLoading(true)
-    console.log("🚀 Memulai inisialisasi dashboard pemantau...")
+    console.log("🚀 Memulai dashboard pemantau...")
 
     try {
         const storedData = localStorage.getItem("userData")
         if (storedData) {
             userData = JSON.parse(storedData)
-            console.log("📦 Data user dari localStorage:", userData)
         }
 
         if (!userData || userData.role !== 'pemantau') {
-            console.log("❌ Bukan pemantau, redirect ke login")
             window.location.href = "index.html"
             return
         }
@@ -111,25 +74,20 @@ window.addEventListener('load', async () => {
         const logoutBtn = document.getElementById("logoutBtn")
         if (logoutBtn) logoutBtn.addEventListener("click", logout)
 
-        const today = getTodayLocal();
-        document.getElementById("filterTanggal").value = today
+        // Set default bulan & tahun saat ini
         document.getElementById("filterBulan").value = new Date().getMonth() + 1
         document.getElementById("filterTahun").value = new Date().getFullYear()
-        currentFilter.tanggal = today
 
-        console.log("📥 Memuat data dari Firestore...")
         await loadData()
-        console.log("✅ Data berhasil dimuat:", { allUsers: allUsers.length, allPresensi: allPresensi.length })
-
         await loadFilterOptions()
         await cekStatusLokasiAktif()
-        await loadRekapHarian()
+        await loadRekapBulanan()
 
         console.log("✅ Dashboard pemantau siap!")
 
     } catch (error) {
-        console.error("❌ Error inisialisasi:", error)
-        showError("Gagal memuat dashboard pemantau: " + error.message)
+        console.error("❌ Error:", error)
+        showError("Gagal memuat dashboard: " + error.message)
     } finally {
         showLoading(false)
     }
@@ -138,13 +96,13 @@ window.addEventListener('load', async () => {
 // ========== LOAD SEMUA DATA ==========
 async function loadData() {
     try {
-        console.log("📥 Mengambil data users dari Firestore...")
+        console.log("📥 Mengambil data users...")
         const usersSnap = await getDocs(collection(db, "users"))
         allUsers = []
         usersSnap.forEach(doc => {
             const data = doc.data()
-            // Ambil semua user kecuali admin
-             if (data.role !== 'admin' && data.role !== 'pemantau') {
+            // Abaikan admin & pemantau
+            if (data.role !== 'admin' && data.role !== 'pemantau') {
                 allUsers.push({
                     id: doc.id,
                     uid: data.uid || doc.id,
@@ -152,15 +110,15 @@ async function loadData() {
                 })
             }
         })
-        console.log(`✅ ${allUsers.length} user berhasil dimuat`)
+        console.log(`✅ ${allUsers.length} user dimuat`)
 
-        console.log("📥 Mengambil data presensi dari Firestore...")
+        console.log("📥 Mengambil data presensi...")
         const presensiSnap = await getDocs(collection(db, "presensi"))
         allPresensi = []
         presensiSnap.forEach(doc => {
             allPresensi.push({ id: doc.id, ...doc.data() })
         })
-        console.log(`✅ ${allPresensi.length} presensi berhasil dimuat`)
+        console.log(`✅ ${allPresensi.length} presensi dimuat`)
 
     } catch (error) {
         console.error("❌ Error load data:", error)
@@ -178,142 +136,21 @@ async function loadFilterOptions() {
             }
         })
 
-        // Isi filter kelurahan untuk harian
-        const selectHarian = document.getElementById("filterKelurahan")
-        if (selectHarian) {
-            selectHarian.innerHTML = '<option value="">Semua Kelurahan</option>'
+        const select = document.getElementById("filterKelurahan")
+        if (select) {
+            select.innerHTML = '<option value="">Semua Kelurahan</option>'
             Array.from(kelurahanSet).sort().forEach(kel => {
                 const option = document.createElement("option")
                 option.value = kel
                 option.textContent = kel
-                selectHarian.appendChild(option)
+                select.appendChild(option)
             })
         }
 
-        // Isi filter kelurahan untuk bulanan
-        const selectBulanan = document.getElementById("filterKelurahanBulanan")
-        if (selectBulanan) {
-            selectBulanan.innerHTML = '<option value="">Semua Kelurahan</option>'
-            Array.from(kelurahanSet).sort().forEach(kel => {
-                const option = document.createElement("option")
-                option.value = kel
-                option.textContent = kel
-                selectBulanan.appendChild(option)
-            })
-        }
-
-        console.log("✅ Filter kelurahan berhasil dimuat:", kelurahanSet.size, "kelurahan")
+        console.log("✅ Filter kelurahan dimuat:", kelurahanSet.size, "kelurahan")
 
     } catch (error) {
         console.error("❌ Error load filter:", error)
-    }
-}
-
-// ========== LOAD REKAP ==========
-function loadRekap() {
-    if (currentMode === 'harian') {
-        loadRekapHarian()
-    } else {
-        loadRekapBulanan()
-    }
-}
-
-// ========== LOAD REKAP HARIAN ==========
-async function loadRekapHarian() {
-    try {
-        console.log("📊 Memuat rekap harian...")
-        const tanggal = document.getElementById("filterTanggal")?.value || getTodayLocal()
-        const kelurahan = document.getElementById("filterKelurahan")?.value || ""
-
-        currentFilter.tanggal = tanggal
-        currentFilter.kelurahan = kelurahan
-
-        const tanggalDisplayEl = document.getElementById("tanggalDisplay")
-        if (tanggalDisplayEl) {
-            tanggalDisplayEl.textContent = formatTanggal(tanggal)
-        }
-
-        let filteredUsers = allUsers
-        if (kelurahan) {
-            filteredUsers = allUsers.filter(u => u.kelurahan === kelurahan)
-        }
-
-        console.log(`👥 Filtered users: ${filteredUsers.length} (kelurahan: ${kelurahan || 'semua'})`)
-
-        const presensiHariIni = allPresensi.filter(p => p.tanggal === tanggal)
-        const presensiMap = new Map()
-        presensiHariIni.forEach(p => presensiMap.set(p.uid, p))
-
-        const usersWithStatus = filteredUsers.map(user => ({
-            ...user,
-            status: presensiMap.has(user.uid) ? 'Hadir' : 'Belum',
-            dataPresensi: presensiMap.get(user.uid)
-        }))
-
-        usersWithStatus.sort((a, b) => {
-            if (a.status === 'Belum' && b.status === 'Hadir') return -1
-            if (a.status === 'Hadir' && b.status === 'Belum') return 1
-            return 0
-        })
-
-        const hadir = usersWithStatus.filter(u => u.status === 'Hadir').length
-        const total = filteredUsers.length
-
-        console.log(`📊 Statistik: ${hadir}/${total} hadir`)
-
-        // Update stat cards
-        const totalFasilitatorEl = document.getElementById("totalFasilitator")
-        const hadirHariIniEl = document.getElementById("hadirHariIni")
-        const belumHadirEl = document.getElementById("belumHadir")
-        const persentaseEl = document.getElementById("persentase")
-
-        if (totalFasilitatorEl) totalFasilitatorEl.textContent = total
-        if (hadirHariIniEl) hadirHariIniEl.textContent = hadir
-        if (belumHadirEl) belumHadirEl.textContent = total - hadir
-        if (persentaseEl) persentaseEl.textContent = total > 0 ? Math.round((hadir / total) * 100) + '%' : '0%'
-
-        // Generate tabel
-        let html = ''
-        usersWithStatus.forEach((user, index) => {
-            const p = user.dataPresensi
-            const statusColor = p ? '#27AE60' : '#E74C3C'
-            const waktu = p ? new Date(p.waktu?.seconds * 1000).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-'
-            const lokasi = p ? (p.lokasi === 'kantor' ? 'Kantor Pusat' : (p.lokasi || '-')) : '-'
-
-            let roleBadge = ''
-            if (user.role === 'koordinator') {
-                roleBadge = '<span style="background:#F39C12; color:white; padding:2px 6px; border-radius:10px; font-size:10px; margin-left:5px;">📋 Koord</span>'
-            }
-
-            html += `
-                <tr style="background: ${!p ? '#FFF5F5' : 'white'};">
-                    <td>${index + 1}</td>
-                    <td style="white-space: normal; word-break: break-word; min-width: 140px;">
-                    ${user.nama || '-'} ${roleBadge}
-                    </td>
-                    <td style="white-space: normal; word-break: break-word; min-width: 120px;">
-                    ${user.kelurahan || '-'}
-                    </td>
-                    <td><span style="color: ${statusColor}; font-weight: bold;">${user.status}</span></td>
-                    <td>${waktu}</td>
-                    <td>${lokasi}</td>
-                </tr>
-            `
-        })
-
-        const tableHarianEl = document.getElementById("tableHarian")
-        if (tableHarianEl) {
-            tableHarianEl.innerHTML = html || '<tr><td colspan="6" class="text-center">Tidak ada data</td></tr>'
-        }
-
-        console.log("✅ Rekap harian berhasil dimuat")
-
-    } catch (error) {
-        console.error("❌ Error load rekap harian:", error)
-        const tableHarianEl = document.getElementById("tableHarian")
-        if (tableHarianEl) {
-            tableHarianEl.innerHTML = `<tr><td colspan="6" class="text-center" style="color:red;">Gagal memuat: ${error.message}</td></tr>`
-        }
     }
 }
 
@@ -323,10 +160,10 @@ async function loadRekapBulanan() {
         console.log("📊 Memuat rekap bulanan...")
         const filterBulanEl = document.getElementById("filterBulan");
         const filterTahunEl = document.getElementById("filterTahun");
-        const filterKelurahanEl = document.getElementById("filterKelurahanBulanan");
+        const filterKelurahanEl = document.getElementById("filterKelurahan");
 
         if (!filterBulanEl || !filterTahunEl) {
-            console.warn("⚠️ Elemen filter bulan/tahun tidak ditemukan");
+            console.warn("⚠️ Elemen filter tidak ditemukan");
             return;
         }
 
@@ -348,35 +185,33 @@ async function loadRekapBulanan() {
             filteredUsers = filteredUsers.filter(u => u.kelurahan === kelurahan);
         }
 
-        console.log(`👥 Filtered users bulanan: ${filteredUsers.length}`)
+        console.log(`👥 Users: ${filteredUsers.length}`)
 
+        // Sorting: Koordinator di atas → Kelurahan A-Z → Nama A-Z
         filteredUsers.sort((a, b) => {
             const isAKoord = a.role === 'koordinator' ? 1 : 0;
             const isBKoord = b.role === 'koordinator' ? 1 : 0;
             if (isAKoord !== isBKoord) return isBKoord - isAKoord;
 
-            const kelurahanA = (a.kelurahan || '').toUpperCase();
-            const kelurahanB = (b.kelurahan || '').toUpperCase();
-            if (kelurahanA < kelurahanB) return -1;
-            if (kelurahanA > kelurahanB) return 1;
+            const kelA = (a.kelurahan || '').toUpperCase();
+            const kelB = (b.kelurahan || '').toUpperCase();
+            if (kelA < kelB) return -1;
+            if (kelA > kelB) return 1;
 
-            const namaA = (a.nama || '').toUpperCase();
-            const namaB = (b.nama || '').toUpperCase();
-            return namaA.localeCompare(namaB);
+            return (a.nama || '').localeCompare(b.nama || '');
         });
 
         const daysInMonth = new Date(tahun, bulan, 0).getDate();
         const strBulan = String(bulan).padStart(2, '0');
 
+        // Hitung hari kerja efektif (Senin-Jumat)
         let totalHariKerjaEfektif = 0;
         for (let d = 1; d <= daysInMonth; d++) {
             const dayOfWeek = new Date(tahun, bulan - 1, d).getDay();
-            if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-                totalHariKerjaEfektif++;
-            }
+            if (dayOfWeek !== 0 && dayOfWeek !== 6) totalHariKerjaEfektif++;
         }
 
-        // Generate header dinamis
+        // Header tabel dinamis (tanggal 1-31)
         const dynamicHeader = document.getElementById("headerBulanan");
         if (dynamicHeader) {
             let headerHtml = '<th>No</th><th>Nama Fasilitator</th><th>Kelurahan</th>';
@@ -389,7 +224,7 @@ async function loadRekapBulanan() {
             dynamicHeader.innerHTML = headerHtml;
         }
 
-        // Mapping presensi
+        // Mapping presensi per user per tanggal
         const presensiMapByUser = {};
         allPresensi.forEach(p => {
             if (p.tanggal && p.uid) {
@@ -402,25 +237,20 @@ async function loadRekapBulanan() {
                     if (p.waktu && typeof p.waktu.toDate === 'function') {
                         try {
                             const dateObj = p.waktu.toDate();
-                            const jam = String(dateObj.getHours()).padStart(2, '0');
-                            const menit = String(dateObj.getMinutes()).padStart(2, '0');
-                            jamAbsen = `${jam}:${menit}`;
+                            jamAbsen = `${String(dateObj.getHours()).padStart(2, '0')}:${String(dateObj.getMinutes()).padStart(2, '0')}`;
                         } catch (e) { }
                     }
 
-                    if (!jamAbsen && p.waktu && p.waktu.seconds !== undefined) {
+                    if (!jamAbsen && p.waktu?.seconds !== undefined) {
                         try {
                             const dateObj = new Date(p.waktu.seconds * 1000);
                             jamAbsen = dateObj.toLocaleTimeString('id-ID', {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                                hour12: false,
-                                timeZone: 'Asia/Jakarta'
+                                hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Jakarta'
                             }).replace(/\./g, ':');
                         } catch (e) { }
                     }
 
-                    if (!jamAbsen && p.waktu && typeof p.waktu === 'string') {
+                    if (!jamAbsen && typeof p.waktu === 'string') {
                         jamAbsen = p.waktu.substring(0, 5);
                     }
 
@@ -445,7 +275,7 @@ async function loadRekapBulanan() {
                 if (isWeekend) {
                     cellsHtml += `<td style="background: #FADBD8; color: #C0392B; text-align: center; font-size: 10px; font-weight: bold;">L</td>`;
                 } else {
-                    const jamMasuk = presensiMapByUser[user.uid] && presensiMapByUser[user.uid][strDate];
+                    const jamMasuk = presensiMapByUser[user.uid]?.[strDate];
 
                     if (jamMasuk && jamMasuk !== "-") {
                         cellsHtml += `
@@ -463,11 +293,7 @@ async function loadRekapBulanan() {
             totalHadirSemua += totalHadirUser;
             const persentase = totalHariKerjaEfektif > 0 ? Math.round((totalHadirUser / totalHariKerjaEfektif) * 100) : 0;
 
-            userStatsForGrafik.push({
-                ...user,
-                totalHadir: totalHadirUser,
-                persentase: persentase
-            });
+            userStatsForGrafik.push({ ...user, totalHadir: totalHadirUser, persentase });
 
             let roleBadge = '';
             if (user.role === 'koordinator') {
@@ -493,16 +319,16 @@ async function loadRekapBulanan() {
 
         const tableBulananEl = document.getElementById("tableBulanan");
         if (tableBulananEl) {
-            tableBulananEl.innerHTML = html || `<tr><td colspan="${daysInMonth + 6}" class="text-center">Tidak ada data terdeteksi</td></tr>`;
+            tableBulananEl.innerHTML = html || `<tr><td colspan="${daysInMonth + 6}" class="text-center">Tidak ada data</td></tr>`;
         }
 
-        // Update stat cards bulanan
+        // Update stat cards
         const totalUser = filteredUsers.length;
         const rataHadir = totalUser > 0 ? (totalHadirSemua / totalUser).toFixed(1) : 0;
         const persenGlobal = totalHariKerjaEfektif > 0 ? Math.round((rataHadir / totalHariKerjaEfektif) * 100) : 0;
 
         const totalHariEl = document.getElementById("totalHari");
-        if (totalHariEl) totalHariEl.textContent = totalHariKerjaEfektif + " Hari Kerja";
+        if (totalHariEl) totalHariEl.textContent = totalHariKerjaEfektif + " Hari";
 
         const rataHadirEl = document.getElementById("rataHadir");
         if (rataHadirEl) rataHadirEl.textContent = rataHadir + " Hari";
@@ -519,10 +345,10 @@ async function loadRekapBulanan() {
         console.log("✅ Rekap bulanan berhasil dimuat")
 
     } catch (error) {
-        console.error("❌ Error load rekap bulanan:", error);
+        console.error("❌ Error:", error);
         const tableBulananEl = document.getElementById("tableBulanan");
         if (tableBulananEl) {
-            tableBulananEl.innerHTML = `<tr><td colspan="15" style="color:red; text-align:center; font-weight:bold; padding:15px;">⚠️ Gagal mengurai data: ${error.message}</td></tr>`;
+            tableBulananEl.innerHTML = `<tr><td colspan="15" style="color:red; text-align:center; padding:15px;">⚠️ Gagal: ${error.message}</td></tr>`;
         }
     }
 }
@@ -541,11 +367,7 @@ function renderGrafik(users, totalHariKerja) {
     users.forEach(user => {
         const height = totalHariKerja > 0 ? (user.totalHadir / totalHariKerja) * 100 : 0
         const bar = document.createElement('div')
-        bar.style.flex = '1'
-        bar.style.display = 'flex'
-        bar.style.flexDirection = 'column'
-        bar.style.alignItems = 'center'
-        bar.style.gap = '5px'
+        bar.style.cssText = 'flex:1; display:flex; flex-direction:column; align-items:center; gap:5px;'
 
         bar.innerHTML = `
             <div style="height: 150px; width: 100%; display: flex; align-items: flex-end;">
@@ -559,101 +381,35 @@ function renderGrafik(users, totalHariKerja) {
     })
 }
 
-// ========== TRIGGER EVENT FILTER ==========
+// ========== FILTER ==========
 window.applyFilter = function() {
-    if (currentMode === 'harian') {
-        loadRekapHarian()
-    } else {
-        loadRekapBulanan()
-    }
+    loadRekapBulanan()
 }
 
 window.resetFilter = function() {
     document.getElementById("filterKelurahan").value = ''
-    document.getElementById("filterKelurahanBulanan").value = ''
-    document.getElementById("filterTanggal").value = getTodayLocal()
     document.getElementById("filterBulan").value = new Date().getMonth() + 1
     document.getElementById("filterTahun").value = new Date().getFullYear()
-    
-    if (currentMode === 'harian') {
-        loadRekapHarian()
-    } else {
-        loadRekapBulanan()
-    }
+    loadRekapBulanan()
 }
 
-// ========== FUNGSI EXPORT EXCEL ==========
-window.exportHarian = async function() {
-    const tanggal = document.getElementById("filterTanggal").value
+// ========== EXPORT EXCEL ==========
+window.exportBulanan = async function() {
+    const bulan = parseInt(document.getElementById("filterBulan").value)
+    const tahun = parseInt(document.getElementById("filterTahun").value)
     const kelurahan = document.getElementById("filterKelurahan").value
 
     showLoading(true)
     try {
-        let filteredUsers = allUsers
+        let filteredUsers = [...allUsers]
         if (kelurahan) {
-            filteredUsers = allUsers.filter(u => u.kelurahan === kelurahan)
+            filteredUsers = filteredUsers.filter(u => u.kelurahan === kelurahan)
         }
+
         filteredUsers.sort((a, b) => {
-            const aKoord = a.role === 'koordinator'
-            const bKoord = b.role === 'koordinator'
-            if (aKoord && !bKoord) return -1
-            if (!aKoord && bKoord) return 1
-            const kelA = (a.kelurahan || '').toUpperCase()
-            const kelB = (b.kelurahan || '').toUpperCase()
-            if (kelA < kelB) return -1
-            if (kelA > kelB) return 1
-            return (a.nama || '').localeCompare(b.nama || '')
-        })
-
-        const presensiHariIni = allPresensi.filter(p => p.tanggal === tanggal)
-        const presensiMap = new Map()
-        presensiHariIni.forEach(p => presensiMap.set(p.uid, p))
-
-        const data = [['No', 'Nama', 'Role', 'Kelurahan', 'Status Kehadiran', 'Waktu Absen', 'Lokasi']]
-
-        let no = 1
-        filteredUsers.forEach(user => {
-            const p = presensiMap.get(user.uid)
-            const status = p ? 'Hadir' : 'Belum Hadir'
-            const waktu = p ? new Date(p.waktu?.seconds * 1000).toLocaleTimeString() : '-'
-            const lokasi = p ? (p.lokasi === 'kantor' ? 'Kantor Pusat' : (p.lokasi || '-')) : '-'
-            const role = user.role === 'koordinator' ? 'Koordinator' : 'Fasilitator'
-
-            data.push([no++, user.nama || '-', role, user.kelurahan || '-', status, waktu, lokasi])
-        })
-
-        const wb = XLSX.utils.book_new()
-        const ws = XLSX.utils.aoa_to_sheet(data)
-        ws['!cols'] = [{ wch: 5 }, { wch: 25 }, { wch: 15 }, { wch: 20 }, { wch: 18 }, { wch: 15 }, { wch: 20 }]
-
-        const fileName = kelurahan ? `Rekap_Harian_${kelurahan}_${tanggal}.xlsx` : `Rekap_Harian_${tanggal}.xlsx`
-        XLSX.utils.book_append_sheet(wb, ws, "Harian")
-        XLSX.writeFile(wb, fileName)
-
-    } catch (error) {
-        console.error("Error export harian:", error)
-        alert("❌ Gagal export harian: " + error.message)
-    } finally {
-        showLoading(false)
-    }
-}
-
-window.exportBulanan = async function() {
-    const bulan = parseInt(document.getElementById("filterBulan").value)
-    const tahun = parseInt(document.getElementById("filterTahun").value)
-    const kelurahan = document.getElementById("filterKelurahanBulanan").value
-
-    showLoading(true)
-    try {
-        let filteredUsers = allUsers
-        if (kelurahan) {
-            filteredUsers = allUsers.filter(u => u.kelurahan === kelurahan)
-        }
-        filteredUsers.sort((a, b) => {
-            const aKoord = a.role === 'koordinator'
-            const bKoord = b.role === 'koordinator'
-            if (aKoord && !bKoord) return -1
-            if (!aKoord && bKoord) return 1
+            const aKoord = a.role === 'koordinator' ? 1 : 0
+            const bKoord = b.role === 'koordinator' ? 1 : 0
+            if (aKoord !== bKoord) return bKoord - aKoord
             const kelA = (a.kelurahan || '').toUpperCase()
             const kelB = (b.kelurahan || '').toUpperCase()
             if (kelA < kelB) return -1
@@ -664,36 +420,31 @@ window.exportBulanan = async function() {
         const daysInMonth = new Date(tahun, bulan, 0).getDate()
         const strBulan = String(bulan).padStart(2, '0')
 
-        let totalHariKerjaEfektif = 0;
+        let totalHariKerjaEfektif = 0
         for (let d = 1; d <= daysInMonth; d++) {
-            const dayOfWeek = new Date(tahun, bulan - 1, d).getDay();
-            if (dayOfWeek !== 0 && dayOfWeek !== 6) totalHariKerjaEfektif++;
+            const dayOfWeek = new Date(tahun, bulan - 1, d).getDay()
+            if (dayOfWeek !== 0 && dayOfWeek !== 6) totalHariKerjaEfektif++
         }
 
-        const headerRow = ['No', 'Nama Fasilitator', 'Role', 'Kelurahan']
-        for (let d = 1; d <= daysInMonth; d++) {
-            headerRow.push(d)
-        }
-        headerRow.push('Total Hadir', 'Hari Kerja', 'Persentase Kehadiran')
+        // Header
+        const headerRow = ['No', 'Nama', 'Role', 'Kelurahan']
+        for (let d = 1; d <= daysInMonth; d++) headerRow.push(d)
+        headerRow.push('Total Hadir', 'Hari Kerja', 'Persentase')
 
         const excelData = [headerRow]
 
+        // Mapping presensi
         const presensiMapByUser = {}
         allPresensi.forEach(p => {
             if (p.tanggal) {
                 const pDate = new Date(p.tanggal)
                 if (pDate.getMonth() + 1 === bulan && pDate.getFullYear() === tahun) {
-                    if (!presensiMapByUser[p.uid]) {
-                        presensiMapByUser[p.uid] = {}
-                    }
+                    if (!presensiMapByUser[p.uid]) presensiMapByUser[p.uid] = {}
                     let jamAbsen = "H"
                     if (p.waktu?.seconds) {
                         const waktu = new Date(p.waktu.seconds * 1000)
                         jamAbsen = waktu.toLocaleTimeString('id-ID', {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                            hour12: false,
-                            timeZone: 'Asia/Jakarta'
+                            hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Jakarta'
                         }).replace(/\./g, ':')
                     }
                     presensiMapByUser[p.uid][p.tanggal] = jamAbsen
@@ -715,7 +466,7 @@ window.exportBulanan = async function() {
                 if (isWeekend) {
                     rowData.push('L')
                 } else {
-                    const jamMasuk = presensiMapByUser[user.uid] && presensiMapByUser[user.uid][strDate]
+                    const jamMasuk = presensiMapByUser[user.uid]?.[strDate]
                     if (jamMasuk) {
                         rowData.push(jamMasuk)
                         totalHadirUser++
@@ -725,7 +476,9 @@ window.exportBulanan = async function() {
                 }
             }
 
-            const persentase = totalHariKerjaEfektif > 0 ? ((totalHadirUser / totalHariKerjaEfektif) * 100).toFixed(1) + '%' : '0%'
+            const persentase = totalHariKerjaEfektif > 0
+                ? ((totalHadirUser / totalHariKerjaEfektif) * 100).toFixed(1) + '%'
+                : '0%'
             rowData.push(totalHadirUser, totalHariKerjaEfektif, persentase)
             excelData.push(rowData)
         })
@@ -744,18 +497,20 @@ window.exportBulanan = async function() {
             ? `Rekap_Bulanan_${kelurahan}_${namaBulan[bulan - 1]}_${tahun}.xlsx`
             : `Rekap_Bulanan_${namaBulan[bulan - 1]}_${tahun}.xlsx`
 
-        XLSX.utils.book_append_sheet(wb, ws, "Rekap Bulanan Matriks")
+        XLSX.utils.book_append_sheet(wb, ws, "Rekap Bulanan")
         XLSX.writeFile(wb, fileName)
 
+        console.log("✅ Export berhasil:", fileName)
+
     } catch (error) {
-        console.error("Error export bulanan:", error)
-        alert("❌ Gagal export bulanan: " + error.message)
+        console.error("❌ Error export:", error)
+        alert("❌ Gagal export: " + error.message)
     } finally {
         showLoading(false)
     }
 }
 
-// ========== FUNGSI MONITORING STATUS LOKASI ==========
+// ========== MONITORING STATUS LOKASI ==========
 async function cekStatusLokasiAktif() {
     const notifEl = document.getElementById("notifikasiStatusLokasi");
     if (!notifEl) return;
@@ -773,8 +528,7 @@ async function cekStatusLokasiAktif() {
                 data.statusLokasi === "custom" &&
                 data.temporaryLocationEnabled &&
                 start && end &&
-                now >= start &&
-                now <= end;
+                now >= start && now <= end;
 
             notifEl.style.display = "block";
 
@@ -782,29 +536,21 @@ async function cekStatusLokasiAktif() {
                 notifEl.innerHTML = `
                     <div style="background-color: #F5EEF8; color: #6C3483; border: 1px solid #D7BDE2; padding: 12px 15px; border-radius: 8px; font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); margin-bottom: 15px;">
                         <span style="font-size: 16px;">🟣</span> 
-                        <span><strong>Status Wilayah:</strong> <strong>Lokasi Custom ("${data.temporaryLocationName}")</strong> sedang diaktifkan oleh Pusat untuk radius ${data.temporaryRadius} meter.</span>
+                        <span><strong>Status Wilayah:</strong> <strong>Lokasi Custom ("${data.temporaryLocationName}")</strong> aktif, radius ${data.temporaryRadius}m.</span>
                     </div>
                 `;
             } else {
                 notifEl.innerHTML = `
                     <div style="background-color: #E8F8F5; color: #117864; border: 1px solid #A3E4D7; padding: 12px 15px; border-radius: 8px; font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); margin-bottom: 15px;">
                         <span style="font-size: 16px;">🟢</span> 
-                        <span><strong>Status Wilayah:</strong> Sistem berjalan normal. <strong>Lokasi Default (Kantor/Kelurahan)</strong> digunakan.</span>
+                        <span><strong>Status Wilayah:</strong> Normal - <strong>Lokasi Default</strong> digunakan.</span>
                     </div>
                 `;
             }
-        } else {
-            notifEl.style.display = "block";
-            notifEl.innerHTML = `
-                <div style="background-color: #E8F8F5; color: #117864; border: 1px solid #A3E4D7; padding: 12px 15px; border-radius: 8px; font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
-                    <span>🟢</span> <span><strong>Status Wilayah:</strong> <strong>Lokasi Default digunakan</strong>.</span>
-                </div>
-            `;
         }
     } catch (error) {
-        console.error("Gagal memeriksa status lokasi:", error);
+        console.error("Gagal cek status lokasi:", error);
     }
 }
 
-// Export semua fungsi yang diperlukan ke window
-console.log("✅ pemantau.js berhasil dimuat dan siap digunakan");
+console.log("✅ pemantau.js siap (mode bulanan only)");
