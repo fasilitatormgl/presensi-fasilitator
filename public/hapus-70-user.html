@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hapus 70 User - Authentication & Firestore</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #EE2737 0%, #BF1E2B 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+        }
+        
+        h1 {
+            color: #EE2737;
+            margin-bottom: 10px;
+        }
+        
+        .warning-box {
+            background: #FEF9E7;
+            border-left: 4px solid #F39C12;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: #F8F9FA;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 36px;
+            font-weight: bold;
+            color: #EE2737;
+        }
+        
+        .email-list {
+            background: #F8F9FA;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .email-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px;
+            border-bottom: 1px solid #E0E0E0;
+        }
+        
+        .email-item:hover {
+            background: #FFF5F5;
+        }
+        
+        .checkbox {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+        
+        .email-text {
+            flex: 1;
+            font-family: monospace;
+        }
+        
+        .status-badge {
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        
+        .status-auth {
+            background: #E8F5E9;
+            color: #27AE60;
+        }
+        
+        .status-firestore {
+            background: #E3F2FD;
+            color: #1976D2;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .btn-danger {
+            background: #E74C3C;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 30px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            flex: 1;
+        }
+        
+        .btn-danger:hover {
+            background: #C0392B;
+        }
+        
+        .btn-warning {
+            background: #F39C12;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 30px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            flex: 1;
+        }
+        
+        .btn-success {
+            background: #27AE60;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 30px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            flex: 1;
+        }
+        
+        .log-area {
+            background: #2C3E50;
+            color: #ECF0F1;
+            padding: 20px;
+            border-radius: 10px;
+            font-family: monospace;
+            height: 200px;
+            overflow-y: auto;
+            margin-top: 30px;
+        }
+        
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.7);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+        
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #EE2737;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .progress-bar {
+            height: 10px;
+            background: #E0E0E0;
+            border-radius: 5px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: #EE2737;
+            width: 0%;
+            transition: width 0.3s;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🗑️ HAPUS 70 USER BERMASALAH</h1>
+        
+        <div class="warning-box">
+            <h3>⚠️ PERHATIAN!</h3>
+            <p>Tool ini akan menghapus 70 user berikut dari Firestore.</p>
+            <p><strong>Total email: 70</strong></p>
+            <p style="color: #E74C3C;">Data yang dihapus TIDAK BISA dikembalikan!</p>
+        </div>
+        
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-value" id="totalEmail">70</div>
+                <div class="stat-label">Total Email</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="selectedCount">0</div>
+                <div class="stat-label">Dipilih</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="deletedCount">0</div>
+                <div class="stat-label">Terhapus</div>
+            </div>
+        </div>
+        
+        <div class="progress-bar">
+            <div class="progress-fill" id="progressFill"></div>
+        </div>
+        
+        <div class="button-group">
+            <button class="btn-warning" onclick="selectAll()">✅ Pilih Semua</button>
+            <button class="btn-warning" onclick="deselectAll()">⬜ Hapus Pilihan</button>
+            <button class="btn-success" onclick="loadFirestoreData()">📥 Load Data Firestore</button>
+        </div>
+        
+        <div class="email-list" id="emailList">
+            <!-- Akan diisi dengan JavaScript -->
+            <p style="text-align: center; color: #7F8C8D;">Memuat daftar email...</p>
+        </div>
+        
+        <div class="button-group">
+            <button class="btn-danger" id="hapusBtn" onclick="hapusSelected()" disabled>🗑️ HAPUS YANG DIPILIH DARI FIRESTORE</button>
+            <button class="btn-danger" onclick="bukaFirebaseAuth()" style="background: #3498DB;">🔑 BUKA AUTHENTICATION</button>
+        </div>
+        
+        <div class="log-area" id="logArea">
+            <div>[System] Siap menghapus 70 user...</div>
+        </div>
+    </div>
+    
+    <div class="loading-overlay" id="loading">
+        <div class="loading-spinner"></div>
+        <p style="color: white; margin-top: 20px;">Menghapus data...</p>
+    </div>
+    
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js"
+        import { getFirestore, collection, getDocs, deleteDoc, doc, query, where } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js"
+        
+        // ========== KONFIGURASI FIREBASE ==========
+const firebaseConfig = {
+  apiKey: "AIzaSyCPANSke88xjUP0Lqpl2PoHSDu-xYtfAkQ",
+  authDomain: "presensi-fasilitator.firebaseapp.com",
+  projectId: "presensi-fasilitator",
+  storageBucket: "presensi-fasilitator.firebasestorage.app",
+  messagingSenderId: "317527501418",
+  appId: "1:317527501418:web:cdefb307e227796479f813"
+};
+        
+        const app = initializeApp(firebaseConfig)
+        const db = getFirestore(app)
+        
+        // ========== DAFTAR 70 EMAIL ==========
+        const EMAIL_LIST = [
+            "Danny@fasilitator.com",
+            "Ardy@fasilitator.com",
+            "Enggar@fasilitator.com",
+            "Chandra@fasilitator.com",
+            "Ardian@fasilitator.com",
+            "Kharisma@fasilitator.com",
+            "Nurul@fasilitator.com",
+            "Febrian@fasilitator.com",
+            "Haning@fasilitator.com",
+            "Aulia@fasilitator.com",
+            "Didik@fasilitator.com",
+            "Febriana@fasilitator.com",
+            "Ida@fasilitator.com",
+            "Dhevi@fasilitator.com",
+            "Wreksaningrum@fasilitator.com",
+            "Agung@fasilitator.com",
+            "Ghina@fasilitator.com",
+            "Muhammad@fasilitator.com",
+            "Andi@fasilitator.com",
+            "Dian@fasilitator.com",
+            "Henry@fasilitator.com",
+            "Muna@fasilitator.com",
+            "Daniel@fasilitator.com",
+            "Novella@fasilitator.com",
+            "Priyo@fasilitator.com",
+            "Rafidha@fasilitator.com",
+            "Dewi@fasilitator.com",
+            "Ivan@fasilitator.com",
+            "Nindhitya@fasilitator.com",
+            "Anisa@fasilitator.com",
+            "Priska@fasilitator.com",
+            "Rosita@fasilitator.com",
+            "Dwi@fasilitator.com",
+            "Vicenco@fasilitator.com",
+            "Briliant@fasilitator.com",
+            "Denny@fasilitator.com",
+            "Refita@fasilitator.com",
+            "Dhika@fasilitator.com",
+            "alfian@fasilitator.com",
+            "Usamah@fasilitator.com",
+            "Nova@fasilitator.com",
+            "Herawan@fasilitator.com",
+            "Wiwit@fasilitator.com",
+            "Deby@fasilitator.com",
+            "Edo@fasilitator.com",
+            "Dinda@fasilitator.com",
+            "Nila@fasilitator.com",
+            "Rhesa@fasilitator.com",
+            "Shafa@fasilitator.com",
+            "Siska@fasilitator.com",
+            "Laili@fasilitator.com",
+            "Hayu@fasilitator.com",
+            "Hikmah@fasilitator.com",
+            "Syahriza@fasilitator.com",
+            "Avissa@fasilitator.com",
+            "Aditya@fasilitator.com",
+            "Aura@fasilitator.com",
+            "Elifa@fasilitator.com",
+            "Eky@fasilitator.com",
+            "Alivia@fasilitator.com",
+            "Eka@fasilitator.com",
+            "Rizky@fasilitator.com",
+            "Rina@fasilitator.com",
+            "Yeni@fasilitator.com",
+            "Zaenal@fasilitator.com",
+            "Wahyu@fasilitator.com",
+            "Lia@fasilitator.com",
+            "Vega@fasilitator.com",
+            "Clarissa@fasilitator.com",
+            "Kalpataru@fasilitator.com"
+        ]
+        
+        // ========== VARIABEL GLOBAL ==========
+        let firestoreDocs = new Map() // Map email -> document ID
+        let selectedEmails = new Set()
+        let deletedCount = 0
+        
+        // ========== INISIALISASI ==========
+        document.getElementById('totalEmail').textContent = EMAIL_LIST.length
+        renderEmailList()
+        
+        // ========== RENDER DAFTAR EMAIL ==========
+        function renderEmailList() {
+            const emailList = document.getElementById('emailList')
+            let html = ''
+            
+            EMAIL_LIST.forEach(email => {
+                const isSelected = selectedEmails.has(email)
+                const docId = firestoreDocs.get(email) || null
+                const status = docId ? '✅' : '❌'
+                
+                html += `
+                    <div class="email-item">
+                        <input type="checkbox" class="checkbox" 
+                               data-email="${email}" 
+                               ${isSelected ? 'checked' : ''} 
+                               onchange="toggleEmail('${email}')">
+                        <span class="email-text">${email}</span>
+                        <span class="status-badge ${docId ? 'status-firestore' : ''}">
+                            ${docId ? '📥 Di Firestore' : '📤 Tidak ada'}
+                        </span>
+                    </div>
+                `
+            })
+            
+            emailList.innerHTML = html
+            updateSelectedCount()
+        }
+        
+        // ========== TOGGLE EMAIL ==========
+        window.toggleEmail = function(email) {
+            if (selectedEmails.has(email)) {
+                selectedEmails.delete(email)
+            } else {
+                selectedEmails.add(email)
+            }
+            updateSelectedCount()
+        }
+        
+        // ========== SELECT ALL ==========
+        window.selectAll = function() {
+            EMAIL_LIST.forEach(email => selectedEmails.add(email))
+            renderEmailList()
+            addLog(`✅ Memilih semua ${selectedEmails.size} email`)
+        }
+        
+        window.deselectAll = function() {
+            selectedEmails.clear()
+            renderEmailList()
+            addLog(`⬜ Semua pilihan dihapus`)
+        }
+        
+        // ========== UPDATE JUMLAH TERPILIH ==========
+        function updateSelectedCount() {
+            const count = selectedEmails.size
+            document.getElementById('selectedCount').textContent = count
+            document.getElementById('hapusBtn').disabled = count === 0
+        }
+        
+        // ========== LOAD DATA DARI FIRESTORE ==========
+        window.loadFirestoreData = async function() {
+            showLoading(true)
+            addLog('📥 Memuat data dari Firestore...')
+            
+            try {
+                const snapshot = await getDocs(collection(db, "users"))
+                firestoreDocs.clear()
+                
+                snapshot.forEach(doc => {
+                    const data = doc.data()
+                    const email = data.email
+                    if (email && EMAIL_LIST.includes(email)) {
+                        firestoreDocs.set(email, doc.id)
+                    }
+                })
+                
+                addLog(`✅ Ditemukan ${firestoreDocs.size} user di Firestore`)
+                renderEmailList()
+                
+            } catch (error) {
+                addLog(`❌ Error: ${error.message}`)
+            } finally {
+                showLoading(false)
+            }
+        }
+        
+        // ========== HAPUS YANG DIPILIH ==========
+        window.hapusSelected = async function() {
+            if (selectedEmails.size === 0) {
+                alert('Pilih email yang akan dihapus!')
+                return
+            }
+            
+            const confirmMsg = `Hapus ${selectedEmails.size} user dari Firestore?\n\n` +
+                              `Data yang dihapus TIDAK BISA dikembalikan!\n\n` +
+                              `Lanjutkan?`
+            
+            if (!confirm(confirmMsg)) return
+            
+            showLoading(true)
+            addLog(`🗑️ Menghapus ${selectedEmails.size} user dari Firestore...`)
+            
+            let success = 0
+            let failed = 0
+            let total = selectedEmails.size
+            let processed = 0
+            
+            for (const email of selectedEmails) {
+                try {
+                    const docId = firestoreDocs.get(email)
+                    
+                    if (docId) {
+                        await deleteDoc(doc(db, "users", docId))
+                        addLog(`✅ Terhapus: ${email}`, 'success')
+                        success++
+                        firestoreDocs.delete(email)
+                    } else {
+                        addLog(`⚠️ Tidak ada di Firestore: ${email}`, 'warning')
+                        failed++
+                    }
+                    
+                } catch (error) {
+                    addLog(`❌ Gagal hapus ${email}: ${error.message}`, 'error')
+                    failed++
+                }
+                
+                processed++
+                const progress = (processed / total) * 100
+                document.getElementById('progressFill').style.width = `${progress}%`
+            }
+            
+            deletedCount += success
+            document.getElementById('deletedCount').textContent = deletedCount
+            
+            addLog(`✅ SELESAI! Berhasil: ${success}, Gagal: ${failed}`)
+            
+            // Hapus dari selected
+            selectedEmails.clear()
+            
+            // Render ulang
+            renderEmailList()
+            
+            showLoading(false)
+            
+            alert(`✅ ${success} user berhasil dihapus dari Firestore!\n\n` +
+                  `⚠️ Sekarang hapus dari Authentication:\n` +
+                  `1. Klik tombol "BUKA AUTHENTICATION"\n` +
+                  `2. Hapus manual satu per satu`)
+        }
+        
+        // ========== BUKA FIREBASE AUTH ==========
+        window.bukaFirebaseAuth = function() {
+            window.open('https://console.firebase.google.com/project/presensi-fasilitator/authentication/users', '_blank')
+        }
+        
+        // ========== FUNGSI LOG ==========
+        function addLog(message, type = 'info') {
+            const logArea = document.getElementById('logArea')
+            const entry = document.createElement('div')
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`
+            entry.style.color = type === 'error' ? '#E74C3C' : (type === 'success' ? '#2ECC71' : '#ECF0F1')
+            logArea.appendChild(entry)
+            logArea.scrollTop = logArea.scrollHeight
+        }
+        
+        // ========== LOADING ==========
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'flex' : 'none'
+        }
+        
+        // ========== AUTO LOAD FIRESTORE DATA ==========
+        setTimeout(() => {
+            loadFirestoreData()
+        }, 1000)
+    </script>
+</body>
+</html>

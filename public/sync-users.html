@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Sync User ke Firestore</title>
+    <style>
+        body { font-family: Arial; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; }
+        h1 { color: #EE2737; }
+        .user-card { background: #f8f9fa; padding: 15px; margin: 10px 0; border-radius: 5px; border-left: 4px solid #3498db; }
+        .btn { background: #EE2737; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; }
+        .btn:hover { background: #BF1E2B; }
+        .success { color: #27AE60; }
+        .error { color: #E74C3C; }
+        pre { background: #2C3E50; color: #ECF0F1; padding: 10px; border-radius: 5px; overflow: auto; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔄 Sync User Authentication ke Firestore</h1>
+        <p>Tool ini akan membaca user dari Authentication dan menambahkannya ke Firestore</p>
+        
+        <button class="btn" onclick="syncUsers()">MULAI SYNC</button>
+        <button class="btn" style="background: #3498DB;" onclick="window.location.reload()">REFRESH</button>
+        
+        <div id="loading" style="display: none; margin: 20px 0;">
+            <p>⏳ Memuat daftar user...</p>
+        </div>
+        
+        <div id="userList" style="margin-top: 20px;"></div>
+        <div id="log" style="margin-top: 20px;"></div>
+    </div>
+    
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js"
+        import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js"
+        import { getFirestore, collection, addDoc, getDocs, query, where, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js"
+        
+const firebaseConfig = {
+  apiKey: "AIzaSyCPANSke88xjUP0Lqpl2PoHSDu-xYtfAkQ",
+  authDomain: "presensi-fasilitator.firebaseapp.com",
+  projectId: "presensi-fasilitator",
+  storageBucket: "presensi-fasilitator.firebasestorage.app",
+  messagingSenderId: "317527501418",
+  appId: "1:317527501418:web:cdefb307e227796479f813"
+};
+        
+        const app = initializeApp(firebaseConfig)
+        const auth = getAuth(app)
+        const db = getFirestore(app)
+        
+        // Daftar email yang sudah didaftarkan (isi dari Authentication)
+        const EMAIL_LIST = [
+            // Masukkan semua email user Anda di sini
+            // Contoh:
+            // "fasilitator1@mail.com",
+            // "fasilitator2@mail.com",
+            // "admin@fasilitator.com",
+        ]
+        
+        // Data user (sesuaikan dengan data Anda)
+        const USER_DATA = {
+            // Format: "email": { nama: "Nama User", role: "user", kelurahan: "Kelurahan" }
+        }
+        
+        window.syncUsers = async function() {
+            const loading = document.getElementById('loading')
+            const userList = document.getElementById('userList')
+            const log = document.getElementById('log')
+            
+            loading.style.display = 'block'
+            userList.innerHTML = ''
+            log.innerHTML = ''
+            
+            try {
+                // Tampilkan form input manual
+                userList.innerHTML = `
+                    <h3>Tambah User Manual ke Firestore</h3>
+                    <div style="background: #f8f9fa; padding: 20px; border-radius: 5px;">
+                        <p>Masukkan data user satu per satu:</p>
+                        
+                        <input type="text" id="inputUID" placeholder="UID dari Authentication" style="width: 100%; padding: 8px; margin-bottom: 10px;">
+                        <input type="text" id="inputNama" placeholder="Nama Lengkap" style="width: 100%; padding: 8px; margin-bottom: 10px;">
+                        <input type="email" id="inputEmail" placeholder="Email" style="width: 100%; padding: 8px; margin-bottom: 10px;">
+                        <select id="inputRole" style="width: 100%; padding: 8px; margin-bottom: 10px;">
+                            <option value="user">User</option>
+                            <option value="koordinator">Koordinator</option>
+                            <option value="admin">Admin</option>
+                        </select>
+                        <input type="text" id="inputKelurahan" placeholder="Kelurahan (opsional)" style="width: 100%; padding: 8px; margin-bottom: 10px;">
+                        
+                        <button onclick="tambahUser()" style="background: #27AE60; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer;">TAMBAH KE FIRESTORE</button>
+                    </div>
+                    
+                    <h3 style="margin-top: 30px;">Atau Tambah Batch dari List</h3>
+                    <textarea id="batchData" rows="10" style="width: 100%; padding: 10px; font-family: monospace;" placeholder='[
+  {"uid": "xxx", "nama": "Budi", "email": "budi@mail.com", "role": "user", "kelurahan": "Magelang"}
+]'></textarea>
+                    <button onclick="tambahBatch()" style="background: #3498DB; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin-top: 10px;">TAMBAH BATCH</button>
+                `
+                
+                // Tampilkan user yang sudah ada di Firestore
+                const usersSnapshot = await getDocs(collection(db, "users"))
+                log.innerHTML = '<h3>📋 User yang sudah ada di Firestore:</h3>'
+                usersSnapshot.forEach(doc => {
+                    const data = doc.data()
+                    log.innerHTML += `<div>✅ ${data.email} - ${data.nama} (${data.role})</div>`
+                })
+                
+                if (usersSnapshot.empty) {
+                    log.innerHTML += '<div class="error">❌ Belum ada user di Firestore</div>'
+                }
+                
+            } catch (error) {
+                log.innerHTML += `<div class="error">❌ Error: ${error.message}</div>`
+            } finally {
+                loading.style.display = 'none'
+            }
+        }
+        
+        window.tambahUser = async function() {
+            const uid = document.getElementById('inputUID').value
+            const nama = document.getElementById('inputNama').value
+            const email = document.getElementById('inputEmail').value
+            const role = document.getElementById('inputRole').value
+            const kelurahan = document.getElementById('inputKelurahan').value
+            
+            if (!uid || !nama || !email || !role) {
+                alert('UID, Nama, Email, dan Role harus diisi!')
+                return
+            }
+            
+            try {
+                // Cek apakah sudah ada
+                const q = query(collection(db, "users"), where("email", "==", email))
+                const existing = await getDocs(q)
+                
+                if (!existing.empty) {
+                    alert(`⚠️ User dengan email ${email} sudah ada di Firestore`)
+                    return
+                }
+                
+                // Tambah ke Firestore
+                await addDoc(collection(db, "users"), {
+                    uid: uid,
+                    nama: nama,
+                    email: email,
+                    role: role,
+                    kelurahan: kelurahan || null,
+                    deviceId: null,
+                    createdAt: new Date()
+                })
+                
+                alert(`✅ User ${email} berhasil ditambahkan!`)
+                
+                // Clear form
+                document.getElementById('inputUID').value = ''
+                document.getElementById('inputNama').value = ''
+                document.getElementById('inputEmail').value = ''
+                document.getElementById('inputKelurahan').value = ''
+                
+                // Refresh
+                window.location.reload()
+                
+            } catch (error) {
+                alert(`❌ Gagal: ${error.message}`)
+            }
+        }
+        
+        window.tambahBatch = async function() {
+            const batchText = document.getElementById('batchData').value
+            
+            try {
+                const users = JSON.parse(batchText)
+                
+                if (!Array.isArray(users)) {
+                    alert('Data harus berupa array!')
+                    return
+                }
+                
+                let success = 0
+                let failed = 0
+                
+                for (const user of users) {
+                    try {
+                        // Validasi
+                        if (!user.uid || !user.nama || !user.email || !user.role) {
+                            console.log('Data tidak lengkap:', user)
+                            failed++
+                            continue
+                        }
+                        
+                        // Cek duplikat
+                        const q = query(collection(db, "users"), where("email", "==", user.email))
+                        const existing = await getDocs(q)
+                        
+                        if (!existing.empty) {
+                            console.log(`Email ${user.email} sudah ada`)
+                            failed++
+                            continue
+                        }
+                        
+                        // Tambah
+                        await addDoc(collection(db, "users"), {
+                            uid: user.uid,
+                            nama: user.nama,
+                            email: user.email,
+                            role: user.role,
+                            kelurahan: user.kelurahan || null,
+                            deviceId: null,
+                            createdAt: new Date()
+                        })
+                        
+                        success++
+                        
+                    } catch (e) {
+                        console.error('Error:', e)
+                        failed++
+                    }
+                }
+                
+                alert(`✅ Selesai!\nBerhasil: ${success}\nGagal: ${failed}`)
+                window.location.reload()
+                
+            } catch (error) {
+                alert(`❌ Error parsing JSON: ${error.message}`)
+            }
+        }
+    </script>
+</body>
+</html>

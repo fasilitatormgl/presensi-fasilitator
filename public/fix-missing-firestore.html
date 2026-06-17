@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fix Missing Firestore Data</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #EE2737 0%, #BF1E2B 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+        }
+        
+        h1 {
+            color: #EE2737;
+            margin-bottom: 20px;
+        }
+        
+        .warning-box {
+            background: #FEF9E7;
+            border-left: 4px solid #F39C12;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+        
+        .user-card {
+            background: #F8F9FA;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #2C3E50;
+        }
+        
+        input, select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #E0E0E0;
+            border-radius: 8px;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+        
+        button {
+            background: #EE2737;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .btn-success {
+            background: #27AE60;
+        }
+        
+        .btn-info {
+            background: #3498DB;
+        }
+        
+        .log-area {
+            background: #2C3E50;
+            color: #ECF0F1;
+            padding: 20px;
+            border-radius: 10px;
+            font-family: monospace;
+            height: 200px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+        
+        .success {
+            color: #2ECC71;
+        }
+        
+        .error {
+            color: #E74C3C;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔄 FIX MISSING FIRESTORE DATA</h1>
+        
+        <div class="warning-box">
+            <h3>⚠️ MASALAH TERIDENTIFIKASI</h3>
+            <p><strong>✅ Login sukses, UID: R54Y7yyEABR1uqFOcNyYCuHrxui2</strong></p>
+            <p><strong>❌ User tidak ditemukan di Firestore</strong></p>
+            <p>Artinya: User ADA di Authentication tapi TIDAK ADA di Firestore.</p>
+        </div>
+        
+        <div class="user-card">
+            <h3>📋 DATA USER DARI LOGIN</h3>
+            <p><strong>UID:</strong> <span id="uid">R54Y7yyEABR1uqFOcNyYCuHrxui2</span></p>
+            <p><strong>Email:</strong> <span id="email">super@fasilitator.com</span></p>
+            <p><strong>Waktu:</strong> <span id="waktu"><?php echo date('Y-m-d H:i:s'); ?></span></p>
+        </div>
+        
+        <div class="form-group">
+            <label>Nama Lengkap</label>
+            <input type="text" id="nama" value="Super User" placeholder="Nama lengkap">
+        </div>
+        
+        <div class="form-group">
+            <label>Role</label>
+            <select id="role">
+                <option value="user" selected>User</option>
+                <option value="koordinator">Koordinator</option>
+                <option value="admin">Admin</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label>Kelurahan (opsional)</label>
+            <input type="text" id="kelurahan" value="Magelang Tengah" placeholder="Kelurahan dampingan">
+        </div>
+        
+        <div>
+            <button class="btn-success" onclick="buatDataFirestore()">✅ BUAT DATA DI FIRESTORE</button>
+            <button class="btn-info" onclick="cekData()">🔍 CEK DATA</button>
+            <button onclick="autoDetect()">🔄 AUTO DETECT</button>
+        </div>
+        
+        <div class="log-area" id="logArea">
+            <div>[System] Siap memperbaiki data Firestore...</div>
+        </div>
+    </div>
+    
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js"
+        import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js"
+        import { getFirestore, collection, addDoc, getDocs, query, where, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js"
+        
+const firebaseConfig = {
+  apiKey: "AIzaSyCPANSke88xjUP0Lqpl2PoHSDu-xYtfAkQ",
+  authDomain: "presensi-fasilitator.firebaseapp.com",
+  projectId: "presensi-fasilitator",
+  storageBucket: "presensi-fasilitator.firebasestorage.app",
+  messagingSenderId: "317527501418",
+  appId: "1:317527501418:web:cdefb307e227796479f813"
+};
+        
+        const app = initializeApp(firebaseConfig)
+        const auth = getAuth(app)
+        const db = getFirestore(app)
+        
+        const uid = "R54Y7yyEABR1uqFOcNyYCuHrxui2"
+        const email = "super@fasilitator.com"
+        
+        function log(message, type = 'info') {
+            const logArea = document.getElementById('logArea')
+            const entry = document.createElement('div')
+            entry.className = type
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`
+            logArea.appendChild(entry)
+            logArea.scrollTop = logArea.scrollHeight
+        }
+        
+        window.cekData = async function() {
+            log('🔍 Mencari data di Firestore...')
+            
+            try {
+                // Cari berdasarkan UID
+                const q1 = query(collection(db, "users"), where("uid", "==", uid))
+                const snapshot1 = await getDocs(q1)
+                
+                if (!snapshot1.empty) {
+                    snapshot1.forEach(doc => {
+                        log(`✅ Ditemukan dengan UID: ${doc.id}`, 'success')
+                        log(`   Data: ${JSON.stringify(doc.data())}`)
+                    })
+                    return
+                }
+                
+                // Cari berdasarkan email
+                const q2 = query(collection(db, "users"), where("email", "==", email))
+                const snapshot2 = await getDocs(q2)
+                
+                if (!snapshot2.empty) {
+                    snapshot2.forEach(doc => {
+                        log(`✅ Ditemukan dengan email: ${doc.id}`, 'success')
+                        log(`   Data: ${JSON.stringify(doc.data())}`)
+                    })
+                    return
+                }
+                
+                log('❌ Tidak ditemukan data di Firestore', 'error')
+                
+            } catch (error) {
+                log(`❌ Error: ${error.message}`, 'error')
+            }
+        }
+        
+        window.buatDataFirestore = async function() {
+            const nama = document.getElementById('nama').value
+            const role = document.getElementById('role').value
+            const kelurahan = document.getElementById('kelurahan').value
+            
+            log('🔄 Membuat data di Firestore...')
+            
+            try {
+                const userData = {
+                    uid: uid,
+                    nama: nama,
+                    email: email,
+                    role: role,
+                    kelurahan: kelurahan || null,
+                    deviceId: null,
+                    deviceCheckEnabled: true,
+                    deviceResetAt: new Date(),
+                    lastResetBy: "fix-missing",
+                    lastSeen: new Date(),
+                    createdAt: new Date()
+                }
+                
+                // Simpan ke Firestore
+                const docRef = await addDoc(collection(db, "users"), userData)
+                
+                log(`✅ Data berhasil dibuat!`, 'success')
+                log(`   Document ID: ${docRef.id}`, 'success')
+                log(`   UID: ${uid}`, 'success')
+                log(`   Email: ${email}`, 'success')
+                log(`   Nama: ${nama}`, 'success')
+                log(`   Role: ${role}`, 'success')
+                
+                alert(`✅ Data berhasil dibuat di Firestore!\n\nUser sekarang bisa login dengan lengkap.`)
+                
+            } catch (error) {
+                log(`❌ Gagal: ${error.message}`, 'error')
+                alert(`❌ Error: ${error.message}`)
+            }
+        }
+        
+        window.autoDetect = async function() {
+            log('🔄 Auto detect data dari login...')
+            
+            try {
+                // Coba login untuk dapat data
+                const password = prompt('Masukkan password untuk super@fasilitator.com:', '123456')
+                if (!password) return
+                
+                const userCredential = await signInWithEmailAndPassword(auth, email, password)
+                const user = userCredential.user
+                
+                log(`✅ Login sukses dengan UID: ${user.uid}`, 'success')
+                
+                // Isi form otomatis
+                document.getElementById('uid').textContent = user.uid
+                document.getElementById('email').textContent = user.email
+                
+                alert(`✅ Data terdeteksi!\n\nUID: ${user.uid}\nEmail: ${user.email}\n\nSekarang klik "BUAT DATA DI FIRESTORE"`)
+                
+            } catch (error) {
+                log(`❌ Login gagal: ${error.message}`, 'error')
+            }
+        }
+        
+        // Auto cek saat halaman dibuka
+        setTimeout(cekData, 1000)
+    </script>
+</body>
+</html>

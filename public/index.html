@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Absensi Fasilitator MGL</title>
+    
+    <link rel="icon" href="absenfasil.ico" type="image/x-icon">
+    
+    <link rel="stylesheet" href="css/style.css">
+    
+    <style>
+        .password-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+        .password-wrapper input {
+            width: 100%;
+            padding-right: 40px; /* Ruang untuk icon mata */
+            box-sizing: border-box;
+        }
+        .password-toggle {
+            position: absolute;
+            right: 10px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1.2rem;
+            color: #7f8c8d;
+            padding: 0;
+            display: flex;
+        }
+        .password-toggle:focus {
+            outline: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-card">
+            <div class="login-logo">
+                <h1>MGL<span>Fasilitator</span></h1>
+                <p>Presensi Digital v7.7</p>
+            </div>
+            
+            <div class="login-form">
+                <div class="input-group">
+                    <label>Email</label>
+                    <input type="email" id="email" placeholder="contoh@email.com">
+                </div>
+                
+                <div class="input-group">
+                    <label>Password</label>
+                    <div class="password-wrapper">
+                        <input type="password" id="password" placeholder="••••••••">
+                        <button type="button" class="password-toggle" onclick="togglePassword()" id="toggleBtn" title="Lihat password">👁️</button>
+                    </div>
+                </div>
+                
+                <button class="btn-login" onclick="login()">MASUK</button>
+            </div>
+            
+            <div class="login-footer">
+                <p>© 2026 Absensi Fasilitator MGL </p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="loading-overlay" id="loading">
+        <div class="loading-spinner"></div>
+    </div>
+    
+    <script type="module" src="js/auth.js"></script>
+</body>
+</html>

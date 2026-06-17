@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Absensi Fasilitator MGL</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+</head>
+<body>
+    <!-- HEADER -->
+    <div class="header">
+        <div class="header-content">
+            <div class="logo">MGL<span>Fasilitator</span></div>
+            <div class="header-right">
+                <div class="status-badge" id="statusBadge">⏳ Memuat...</div>
+                <button class="btn-logout" id="logoutBtn">
+                    <span>🚪</span>
+                    <span class="logout-text">Keluar</span>
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- GREETING CARD -->
+<div class="greeting-card">
+    <div class="greeting-avatar" id="avatar">👤</div>
+    <div class="greeting-text">
+        <div class="greeting-hello">Halo, Selamat Datang</div>
+        
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <img src="absensifasil.png" alt="Logo" style="height: 30px; width: auto; object-fit: contain;">
+            <div class="greeting-name" id="userName">Fasilitator</div>
+        </div>
+        
+        <div class="greeting-role" id="userRole">User</div>
+    </div>
+</div>
+    
+    <!-- STATUS PRESENSI -->
+    <div class="card">
+        <div class="card-title">
+            <span class="card-icon">📋</span>
+            <h3>Status Presensi Hari Ini</h3>
+        </div>
+        <div class="status-container">
+            <div class="status-icon" id="statusEmoji">⏰</div>
+            <div class="status-text" id="statusText">Memuat status...</div>
+            <div class="status-time" id="presensiTime"></div>
+            <button class="btn-presensi" id="btnPresensi">
+                <span>📍</span> Presensi Sekarang
+            </button>
+        </div>
+    </div>
+    
+    <!-- MAP SECTION -->
+    <div class="card">
+        <div class="card-title">
+            <span class="card-icon">🗺️</span>
+            <h3>Lokasi Presensi</h3>
+        </div>
+        <div class="map-wrapper">
+            <div id="map" class="map-container-small"></div>
+            <div class="map-legend">
+                <div class="legend-item">
+                    <div class="legend-dot kantor"></div>
+                    <span>Kantor Pusat</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-dot kelurahan"></div>
+                    <span>Kelurahan Dampingan</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-dot user"></div>
+                    <span>Lokasi Anda</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- LOKASI PRESENSI -->
+    <div class="card">
+    <div class="card-title">
+        <span class="card-icon">📍</span>
+        <h3>Titik Presensi</h3>
+    </div>
+    <div class="location-list">
+        
+        <div class="location-item" id="lokasiSementara" style="display: none;">
+            <div class="location-header">
+                <span class="location-icon">🎪</span>
+                <div class="location-info">
+                    <div class="location-name" id="namaSementara">Lokasi Tugas Sementara</div>
+                    <div class="location-distance" id="jarakSementara">Menghitung jarak...</div>
+                </div>
+            </div>
+            <div class="distance-bar-container">
+                <div class="distance-bar" id="progressSementara" style="width: 0%"></div>
+            </div>
+            <div class="distance-status" id="statusSementara">📍 Di luar radius</div>
+        </div>
+
+        <div class="location-item" id="lokasiKantor">
+            <div class="location-header">
+                <span class="location-icon">🏢</span>
+                <div class="location-info">
+                    <div class="location-name" id="namaKantor">Kantor Pusat</div>
+                    <div class="location-distance" id="jarakKantor">Menghitung jarak...</div>
+                </div>
+            </div>
+            <div class="distance-bar-container">
+                <div class="distance-bar" id="progressKantor" style="width: 0%"></div>
+            </div>
+            <div class="distance-status" id="statusKantor">📍 Di luar radius</div>
+        </div>
+        
+        <div class="location-item" id="lokasiKelurahan">
+            <div class="location-header">
+                <span class="location-icon">🏘️</span>
+                <div class="location-info">
+                    <div class="location-name" id="namaKelurahan">Kelurahan Dampingan</div>
+                    <div class="location-distance" id="jarakKelurahan">Menghitung jarak...</div>
+                </div>
+            </div>
+            <div class="distance-bar-container">
+                <div class="distance-bar" id="progressKelurahan" style="width: 0%"></div>
+            </div>
+            <div class="distance-status" id="statusKelurahan">📍 Di luar radius</div>
+        </div>
+
+    </div>
+</div>
+    
+    <!-- REKAP HARI INI -->
+    <div class="card">
+        <div class="card-title">
+            <span class="card-icon">📊</span>
+            <h3>Rekap Presensi Hari Ini</h3>
+        </div>
+        <div class="rekap-container" id="rekapContainer">
+            <p class="rekap-empty">Memuat data...</p>
+        </div>
+    </div>
+    
+    <!-- LOADING OVERLAY -->
+    <div class="loading-overlay" id="loading">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Memuat...</div>
+    </div>
+    
+    <!-- ERROR MODAL -->
+    <div class="modal" id="errorModal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-icon">⚠️</div>
+            <h3 class="modal-title">Terjadi Kesalahan!!! Pastikan Pengaturan Lokasi di HP Aktif dan Login di Browser Yang sama kemudian silahkan Reload Halaman ini</h3>
+            <p class="modal-message" id="errorMessage"></p>
+            <button class="modal-button" onclick="closeErrorModal()">Tutup</button>
+        </div>
+    </div>
+    
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script type="module" src="js/dashboard.js"></script>
+</body>
+</html>

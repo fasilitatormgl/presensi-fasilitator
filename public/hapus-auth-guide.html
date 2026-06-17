@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Panduan Hapus Authentication</title>
+    <style>
+        body {
+            font-family: Arial;
+            padding: 30px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #EE2737;
+        }
+        .step {
+            background: #F8F9FA;
+            padding: 20px;
+            border-radius: 5px;
+            margin: 20px 0;
+            border-left: 4px solid #3498DB;
+        }
+        .email-list {
+            background: #2C3E50;
+            color: #ECF0F1;
+            padding: 20px;
+            border-radius: 5px;
+            font-family: monospace;
+            columns: 3;
+            font-size: 12px;
+            margin: 20px 0;
+        }
+        .btn {
+            background: #EE2737;
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 30px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 10px 0;
+        }
+        .btn:hover {
+            background: #BF1E2B;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📋 PANDUAN HAPUS AUTHENTICATION</h1>
+        
+        <div class="step">
+            <h3>Langkah 1: Hapus Firestore Dulu</h3>
+            <p>Gunakan file <strong>hapus-70-user.html</strong> untuk menghapus dari Firestore.</p>
+        </div>
+        
+        <div class="step">
+            <h3>Langkah 2: Buka Firebase Authentication</h3>
+            <button class="btn" onclick="window.open('https://console.firebase.google.com/project/presensi-fasilitator/authentication/users', '_blank')">
+                🔑 BUKA AUTHENTICATION
+            </button>
+        </div>
+        
+        <div class="step">
+            <h3>Langkah 3: Hapus Manual 70 Email</h3>
+            <p>Copy paste email berikut, cari satu per satu di Authentication:</p>
+            <div class="email-list" id="emailList"></div>
+        </div>
+        
+        <div class="step">
+            <h3>Langkah 4: Setelah Semua Bersih</h3>
+            <p>Import ulang dengan file Excel yang benar menggunakan <strong>import-massal.html</strong></p>
+        </div>
+    </div>
+    
+    <script>
+        const EMAIL_LIST = [
+            "Danny@fasilitator.com",
+            "Ardy@fasilitator.com",
+            "Enggar@fasilitator.com",
+            "Chandra@fasilitator.com",
+            "Ardian@fasilitator.com",
+            "Kharisma@fasilitator.com",
+            "Nurul@fasilitator.com",
+            "Febrian@fasilitator.com",
+            "Haning@fasilitator.com",
+            "Aulia@fasilitator.com",
+            "Didik@fasilitator.com",
+            "Febriana@fasilitator.com",
+            "Ida@fasilitator.com",
+            "Dhevi@fasilitator.com",
+            "Wreksaningrum@fasilitator.com",
+            "Agung@fasilitator.com",
+            "Ghina@fasilitator.com",
+            "Muhammad@fasilitator.com",
+            "Andi@fasilitator.com",
+            "Dian@fasilitator.com",
+            "Henry@fasilitator.com",
+            "Muna@fasilitator.com",
+            "Daniel@fasilitator.com",
+            "Novella@fasilitator.com",
+            "Priyo@fasilitator.com",
+            "Rafidha@fasilitator.com",
+            "Dewi@fasilitator.com",
+            "Ivan@fasilitator.com",
+            "Nindhitya@fasilitator.com",
+            "Anisa@fasilitator.com",
+            "Priska@fasilitator.com",
+            "Rosita@fasilitator.com",
+            "Dwi@fasilitator.com",
+            "Vicenco@fasilitator.com",
+            "Briliant@fasilitator.com",
+            "Denny@fasilitator.com",
+            "Refita@fasilitator.com",
+            "Dhika@fasilitator.com",
+            "alfian@fasilitator.com",
+            "Usamah@fasilitator.com",
+            "Nova@fasilitator.com",
+            "Herawan@fasilitator.com",
+            "Wiwit@fasilitator.com",
+            "Deby@fasilitator.com",
+            "Edo@fasilitator.com",
+            "Dinda@fasilitator.com",
+            "Nila@fasilitator.com",
+            "Rhesa@fasilitator.com",
+            "Shafa@fasilitator.com",
+            "Siska@fasilitator.com",
+            "Laili@fasilitator.com",
+            "Hayu@fasilitator.com",
+            "Hikmah@fasilitator.com",
+            "Syahriza@fasilitator.com",
+            "Avissa@fasilitator.com",
+            "Aditya@fasilitator.com",
+            "Aura@fasilitator.com",
+            "Elifa@fasilitator.com",
+            "Eky@fasilitator.com",
+            "Alivia@fasilitator.com",
+            "Eka@fasilitator.com",
+            "Rizky@fasilitator.com",
+            "Rina@fasilitator.com",
+            "Yeni@fasilitator.com",
+            "Zaenal@fasilitator.com",
+            "Wahyu@fasilitator.com",
+            "Lia@fasilitator.com",
+            "Vega@fasilitator.com",
+            "Clarissa@fasilitator.com",
+            "Kalpataru@fasilitator.com"
+        ]
+        
+        document.getElementById('emailList').innerHTML = EMAIL_LIST.map(email => 
+            `<div>${email}</div>`
+        ).join('')
+    </script>
+</body>
+</html>

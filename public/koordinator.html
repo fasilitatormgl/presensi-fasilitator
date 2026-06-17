@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Koordinator - Rekap Presensi</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <!-- HEADER -->
+    <div class="header">
+        <div class="header-content">
+            <div class="logo">MGL<span>Koordinator</span></div>
+            <div class="header-right">
+                <div class="status-badge" id="roleBadge">📋 Koordinator</div>
+                <button class="btn-logout" id="logoutBtn">
+                    <span>🚪</span>
+                    <span class="logout-text">Keluar</span>
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- GREETING -->
+    <div class="greeting-card">
+        <div class="greeting-avatar" id="avatar">👤</div>
+        <div class="greeting-text">
+            <div class="greeting-hello">Halo, Koordinator</div>
+            <div class="greeting-name" id="userName">Koordinator</div>
+            <div class="greeting-role" id="userRole">Wilayah Magelang</div>
+        </div>
+    </div>
+    
+    <!-- STATISTIK CEPAT -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-value" id="totalFasilitator">0</div>
+            <div class="stat-label">Total Fasilitator</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="hadirHariIni">0</div>
+            <div class="stat-label">Hadir Hari Ini</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="belumHadir">0</div>
+            <div class="stat-label">Belum Hadir</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="persentase">0%</div>
+            <div class="stat-label">Kehadiran</div>
+        </div>
+    </div>
+    
+    <!-- FILTER SECTION -->
+    <div class="card">
+        <div class="card-title">
+            <span class="card-icon">🔍</span>
+            <h3>Filter Rekap</h3>
+        </div>
+        <div class="filter-group" style="margin-bottom: 15px;">
+            <select id="filterKelurahan" class="filter-select">
+                <option value="">Semua Kelurahan</option>
+            </select>
+            
+            <input type="date" id="filterTanggal" class="filter-date">
+            
+            <select id="filterBulan" class="filter-select" style="display: none;">
+                <option value="">Pilih Bulan</option>
+            </select>
+            
+            <select id="filterTahun" class="filter-select" style="display: none;">
+                <option value="">Pilih Tahun</option>
+            </select>
+        </div>
+        
+        <div style="display: flex; gap: 10px; margin-top: 10px;">
+            <button class="btn-filter" onclick="showHarian()" style="flex: 1; background: #3498DB;">📅 Harian</button>
+            <button class="btn-filter" onclick="showBulanan()" style="flex: 1; background: #27AE60;">📊 Bulanan</button>
+            <button class="btn-reset" onclick="resetFilter()" style="flex: 1;">⟲ Reset</button>
+        </div>
+    </div>
+    
+    <!-- TABEL REKAP HARIAN -->
+    <div class="card" id="rekapHarian">
+        <div class="card-title">
+            <span class="card-icon">📋</span>
+            <h3>Rekap Presensi Harian</h3>
+            <span style="margin-left: auto; font-size: 12px; color: #7F8C8D;" id="tanggalDisplay"></span>
+        </div>
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>No</th>
+                        <th>Nama</th>
+                        <th>Kelurahan</th>
+                        <th>Status</th>
+                        <th>Waktu</th>
+                        <th>Lokasi</th>
+                    </tr>
+                </thead>
+                <tbody id="tableHarian">
+                    <tr>
+                        <td colspan="6" class="text-center">Memuat data...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <!-- TABEL REKAP BULANAN -->
+    <div class="card" id="rekapBulanan" style="display: none;">
+        <div class="card-title">
+            <span class="card-icon">📊</span>
+            <h3>Rekap Presensi Bulanan</h3>
+            <span style="margin-left: auto; font-size: 12px; color: #7F8C8D;" id="bulanDisplay"></span>
+        </div>
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>No</th>
+                        <th>Nama</th>
+                        <th>Kelurahan</th>
+                        <th>Total Hadir</th>
+                        <th>Total Hari</th>
+                        <th>Persentase</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBulanan">
+                    <tr>
+                        <td colspan="6" class="text-center">Memuat data...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- GRAFIK SEDERHANA -->
+        <div style="margin-top: 20px; padding: 15px; background: #F8F9FA; border-radius: 8px;">
+            <h4 style="margin-bottom: 10px;">📈 Grafik Kehadiran</h4>
+            <div id="grafikContainer" style="height: 200px; display: flex; align-items: flex-end; gap: 5px;">
+                <!-- Grafik akan diisi dengan JavaScript -->
+            </div>
+        </div>
+    </div>
+    
+    <!-- EXPORT BUTTONS -->
+    <div class="card">
+        <div class="button-group">
+            <button class="btn-outline" onclick="exportToExcel()">
+                <span>📥</span> Export Excel
+            </button>
+            <button class="btn-outline" onclick="exportToPDF()">
+                <span>📄</span> Export PDF
+            </button>
+            <button class="btn-outline" onclick="printRekap()">
+                <span>🖨️</span> Print
+            </button>
+        </div>
+    </div>
+    
+    <!-- LOADING -->
+    <div class="loading-overlay" id="loading">
+        <div class="loading-spinner"></div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+    <script type="module" src="js/koordinator.js"></script>
+    <!-- Pastikan di bagian bawah ada script XLSX -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+<script type="module" src="js/koordinator.js"></script>
+</body>
+</html>

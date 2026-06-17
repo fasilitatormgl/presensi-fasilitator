@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fix UID - Perbaikan Data User</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #EE2737 0%, #BF1E2B 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+        }
+        
+        h1 {
+            color: #EE2737;
+            margin-bottom: 20px;
+        }
+        
+        .warning-box {
+            background: #FEF9E7;
+            border-left: 4px solid #F39C12;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+        
+        .user-card {
+            background: #F8F9FA;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-left: 4px solid #3498DB;
+        }
+        
+        button {
+            background: #EE2737;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        
+        .btn-success {
+            background: #27AE60;
+        }
+        
+        .btn-warning {
+            background: #F39C12;
+        }
+        
+        .log-area {
+            background: #2C3E50;
+            color: #ECF0F1;
+            padding: 20px;
+            border-radius: 10px;
+            font-family: monospace;
+            height: 200px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        
+        th {
+            background: #EE2737;
+            color: white;
+            padding: 10px;
+            text-align: left;
+        }
+        
+        td {
+            padding: 10px;
+            border-bottom: 1px solid #E0E0E0;
+        }
+        
+        .status-badge {
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        
+        .status-ok {
+            background: #E8F5E9;
+            color: #27AE60;
+        }
+        
+        .status-error {
+            background: #FFEBEE;
+            color: #E74C3C;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔄 FIX UID - PERBAIKAN DATA USER</h1>
+        
+        <div class="warning-box">
+            <h3>⚠️ MASALAH TERIDENTIFIKASI</h3>
+            <p><strong>uid: userCredential.user.uid</strong> - Ini bermasalah karena:</p>
+            <ul style="margin-left: 20px; margin-top: 10px;">
+                <li>❌ Saat user dibuat ulang, UID di Authentication BERUBAH</li>
+                <li>❌ Tapi UID di Firestore masih MENGGUNAKAN YANG LAMA</li>
+                <li>✅ Akibatnya: Login gagal karena UID tidak cocok</li>
+            </ul>
+        </div>
+        
+        <div style="margin-bottom: 20px;">
+            <button onclick="loadUsers()" class="btn-success">📋 LOAD SEMUA USER</button>
+            <button onclick="fixAllUids()" class="btn-warning">🔧 FIX SEMUA UID</button>
+            <button onclick="fixTestUser()">✅ FIX USER test@test.com</button>
+        </div>
+        
+        <div id="userTableContainer">
+            <table id="userTable">
+                <thead>
+                    <tr>
+                        <th>Email</th>
+                        <th>UID Firestore</th>
+                        <th>Status Auth</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="userTableBody">
+                    <tr>
+                        <td colspan="4" style="text-align: center;">Klik LOAD SEMUA USER</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="log-area" id="logArea">
+            <div>[System] Siap memperbaiki UID...</div>
+        </div>
+    </div>
+    
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js"
+        import { getAuth, signInWithEmailAndPassword, fetchSignInMethodsForEmail } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js"
+        import { getFirestore, collection, getDocs, doc, updateDoc, query, where } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js"
+        
+const firebaseConfig = {
+  apiKey: "AIzaSyCPANSke88xjUP0Lqpl2PoHSDu-xYtfAkQ",
+  authDomain: "presensi-fasilitator.firebaseapp.com",
+  projectId: "presensi-fasilitator",
+  storageBucket: "presensi-fasilitator.firebasestorage.app",
+  messagingSenderId: "317527501418",
+  appId: "1:317527501418:web:cdefb307e227796479f813"
+};
+        
+        const app = initializeApp(firebaseConfig)
+        const auth = getAuth(app)
+        const db = getFirestore(app)
+        
+        function log(message) {
+            const logArea = document.getElementById('logArea')
+            logArea.innerHTML += `<div>[${new Date().toLocaleTimeString()}] ${message}</div>`
+            logArea.scrollTop = logArea.scrollHeight
+        }
+        
+        // LOAD SEMUA USER
+        window.loadUsers = async function() {
+            log('📋 Memuat semua user dari Firestore...')
+            
+            try {
+                const snapshot = await getDocs(collection(db, "users"))
+                let tableHtml = ''
+                
+                for (const doc of snapshot.docs) {
+                    const data = doc.data()
+                    
+                    // Cek apakah user ada di Authentication
+                    let authStatus = '❌ Tidak Ada'
+                    let authUid = '-'
+                    
+                    try {
+                        // Kita tidak bisa ambil UID dari Auth langsung, tapi kita bisa cek dengan login test
+                        const methods = await fetchSignInMethodsForEmail(auth, data.email)
+                        authStatus = methods.length > 0 ? '✅ Ada' : '❌ Tidak Ada'
+                    } catch (e) {
+                        authStatus = '❌ Error'
+                    }
+                    
+                    tableHtml += `
+                        <tr>
+                            <td>${data.email || '-'}</td>
+                            <td>${data.uid || '-'}</td>
+                            <td><span class="status-badge ${authStatus.includes('Ada') ? 'status-ok' : 'status-error'}">${authStatus}</span></td>
+                            <td>
+                                <button onclick="fixUser('${doc.id}', '${data.email}')">🔧 Fix</button>
+                            </td>
+                        </tr>
+                    `
+                }
+                
+                document.getElementById('userTableBody').innerHTML = tableHtml
+                log(`✅ Load selesai. Total: ${snapshot.size} user`)
+                
+            } catch (error) {
+                log(`❌ Error: ${error.message}`)
+            }
+        }
+        
+        // FIX USER TERTENTU
+        window.fixUser = async function(docId, email) {
+            log(`🔧 Memperbaiki UID untuk: ${email}`)
+            
+            try {
+                // Step 1: Coba login untuk mendapatkan UID baru
+                // Tapi kita tidak tahu passwordnya, jadi kita akan minta input
+                const password = prompt(`Masukkan password untuk ${email} (default: 123456):`, '123456')
+                if (!password) return
+                
+                // Step 2: Coba login
+                try {
+                    const userCredential = await signInWithEmailAndPassword(auth, email, password)
+                    const newUid = userCredential.user.uid
+                    
+                    log(`✅ Login sukses! UID baru: ${newUid}`)
+                    
+                    // Step 3: Update UID di Firestore
+                    await updateDoc(doc(db, "users", docId), {
+                        uid: newUid,
+                        lastSeen: new Date()
+                    })
+                    
+                    log(`✅ UID di Firestore telah diperbarui!`)
+                    
+                } catch (loginError) {
+                    log(`❌ Login gagal: ${loginError.message}`)
+                    
+                    // Opsi alternatif: Buat ulang user
+                    if (confirm('Login gagal. Buat ulang user di Authentication?')) {
+                        await createNewAuthUser(email, docId)
+                    }
+                }
+                
+            } catch (error) {
+                log(`❌ Error: ${error.message}`)
+            }
+            
+            // Reload tabel
+            loadUsers()
+        }
+        
+        // FIX USER TEST
+        window.fixTestUser = async function() {
+            log('🔧 Memperbaiki user test@test.com...')
+            
+            try {
+                // Cari dokumen test@test.com
+                const q = query(collection(db, "users"), where("email", "==", "test@test.com"))
+                const snapshot = await getDocs(q)
+                
+                if (snapshot.empty) {
+                    log('❌ User test@test.com tidak ditemukan di Firestore')
+                    return
+                }
+                
+                const docSnapshot = snapshot.docs[0]
+                const docId = docSnapshot.id
+                const oldData = docSnapshot.data()
+                
+                log(`📋 Data lama - UID: ${oldData.uid}`)
+                
+                // Coba login untuk mendapatkan UID baru
+                try {
+                    const userCredential = await signInWithEmailAndPassword(auth, 'test@test.com', '123456')
+                    const newUid = userCredential.user.uid
+                    
+                    log(`✅ Login sukses! UID baru: ${newUid}`)
+                    
+                    // Update Firestore dengan UID baru
+                    await updateDoc(doc(db, "users", docId), {
+                        uid: newUid,
+                        lastSeen: new Date(),
+                        deviceId: null,
+                        deviceResetAt: new Date(),
+                        lastResetBy: 'fix-uid-tool'
+                    })
+                    
+                    log(`✅ UID test@test.com berhasil diperbarui!`)
+                    
+                } catch (loginError) {
+                    log(`❌ Login gagal: ${loginError.message}`)
+                    
+                    // Buat ulang user
+                    if (confirm('Login gagal. Buat ulang user test@test.com?')) {
+                        await createNewAuthUser('test@test.com', docId, oldData)
+                    }
+                }
+                
+            } catch (error) {
+                log(`❌ Error: ${error.message}`)
+            }
+            
+            loadUsers()
+        }
+        
+        // BUAT ULANG USER DI AUTHENTICATION
+        async function createNewAuthUser(email, docId, oldData = null) {
+            log(`🔄 Membuat ulang user: ${email}`)
+            
+            const newPassword = prompt('Masukkan password baru:', '123456')
+            if (!newPassword) return
+            
+            try {
+                // Buat user baru di Authentication
+                const { createUserWithEmailAndPassword } = await import("https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js")
+                const userCredential = await createUserWithEmailAndPassword(auth, email, newPassword)
+                const newUid = userCredential.user.uid
+                
+                log(`✅ User baru dibuat! UID: ${newUid}`)
+                
+                // Update Firestore dengan data yang dipertahankan
+                const updateData = {
+                    uid: newUid,
+                    lastSeen: new Date(),
+                    deviceResetAt: new Date(),
+                    lastResetBy: 'fix-uid-tool'
+                }
+                
+                // Pertahankan data lama jika ada
+                if (oldData) {
+                    if (oldData.nama) updateData.nama = oldData.nama
+                    if (oldData.role) updateData.role = oldData.role
+                    if (oldData.kelurahan) updateData.kelurahan = oldData.kelurahan
+                }
+                
+                await updateDoc(doc(db, "users", docId), updateData)
+                
+                log(`✅ Firestore diperbarui!`)
+                log(`📧 Email: ${email}`)
+                log(`🔑 Password: ${newPassword}`)
+                
+            } catch (error) {
+                log(`❌ Gagal membuat user: ${error.message}`)
+            }
+        }
+        
+        // FIX SEMUA UID
+        window.fixAllUids = async function() {
+            if (!confirm('Perbaiki semua UID? Proses ini akan memakan waktu.')) return
+            
+            log('🔄 Memulai perbaikan semua UID...')
+            
+            try {
+                const snapshot = await getDocs(collection(db, "users"))
+                let fixed = 0
+                let failed = 0
+                
+                for (const doc of snapshot.docs) {
+                    const data = doc.data()
+                    log(`⏳ Memproses: ${data.email}`)
+                    
+                    try {
+                        // Coba login untuk dapat UID baru
+                        // Ini hanya akan berhasil jika kita tahu passwordnya
+                        // Alternatif: kita hanya bisa memperbaiki yang kita tahu passwordnya
+                        
+                        // Untuk demo, kita akan lewati yang tidak bisa
+                        log(`⏭️ Lewati: ${data.email} - perlu manual`)
+                        failed++
+                        
+                    } catch (e) {
+                        failed++
+                    }
+                    
+                    await new Promise(resolve => setTimeout(resolve, 200))
+                }
+                
+                log(`✅ Selesai! Diperbaiki: ${fixed}, Gagal: ${failed}`)
+                
+            } catch (error) {
+                log(`❌ Error: ${error.message}`)
+            }
+            
+            loadUsers()
+        }
+        
+        // Auto load
+        setTimeout(loadUsers, 1000)
+    </script>
+</body>
+</html>

@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Login</title>
+    <style>
+        body { font-family: Arial; padding: 30px; background: #f5f5f5; }
+        .container { max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; }
+        h1 { color: #EE2737; }
+        .card { background: #f8f9fa; padding: 20px; border-radius: 5px; margin-bottom: 20px; }
+        input, button { padding: 10px; margin: 5px 0; width: 100%; }
+        button { background: #EE2737; color: white; border: none; cursor: pointer; }
+        pre { background: #2C3E50; color: #ECF0F1; padding: 10px; border-radius: 5px; overflow: auto; }
+        .success { color: #27AE60; }
+        .error { color: #E74C3C; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 DEBUG LOGIN</h1>
+        
+        <div class="card">
+            <h3>Step 1: Cek Koneksi Firebase</h3>
+            <button onclick="cekFirebase()">Test Firebase</button>
+            <div id="firebaseResult"></div>
+        </div>
+        
+        <div class="card">
+            <h3>Step 2: Coba Login</h3>
+            <input type="email" id="email" placeholder="Email" value="admin@fasilitator.com">
+            <input type="password" id="password" placeholder="Password" value="admin123">
+            <button onclick="testLogin()">TEST LOGIN</button>
+            <div id="loginResult"></div>
+        </div>
+        
+        <div class="card">
+            <h3>Step 3: Cek Data User di Firestore</h3>
+            <input type="email" id="cekEmail" placeholder="Email" value="admin@fasilitator.com">
+            <button onclick="cekUser()">CEK USER</button>
+            <div id="userResult"></div>
+        </div>
+        
+        <div class="card">
+            <h3>📋 LOG DETAIL</h3>
+            <pre id="logArea">Belum ada log...</pre>
+        </div>
+    </div>
+    
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js"
+        import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js"
+        import { getFirestore, collection, query, where, getDocs, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js"
+        
+const firebaseConfig = {
+  apiKey: "AIzaSyCPANSke88xjUP0Lqpl2PoHSDu-xYtfAkQ",
+  authDomain: "presensi-fasilitator.firebaseapp.com",
+  projectId: "presensi-fasilitator",
+  storageBucket: "presensi-fasilitator.firebasestorage.app",
+  messagingSenderId: "317527501418",
+  appId: "1:317527501418:web:cdefb307e227796479f813"
+};
+        
+        const app = initializeApp(firebaseConfig)
+        const auth = getAuth(app)
+        const db = getFirestore(app)
+        
+        function log(message, type = 'info') {
+            const logArea = document.getElementById('logArea')
+            logArea.innerHTML += `[${new Date().toLocaleTimeString()}] ${message}\n`
+            console.log(message)
+        }
+        
+        window.cekFirebase = function() {
+            log('🔌 Testing Firebase connection...')
+            
+            if (app) {
+                document.getElementById('firebaseResult').innerHTML = '<span class="success">✅ Firebase terinisialisasi</span>'
+                log('✅ Firebase OK')
+            } else {
+                document.getElementById('firebaseResult').innerHTML = '<span class="error">❌ Firebase gagal</span>'
+                log('❌ Firebase error')
+            }
+        }
+        
+        window.testLogin = async function() {
+            const email = document.getElementById('email').value
+            const password = document.getElementById('password').value
+            
+            log(`🔑 Mencoba login dengan email: ${email}`)
+            
+            try {
+                const userCredential = await signInWithEmailAndPassword(auth, email, password)
+                const user = userCredential.user
+                
+                log(`✅ Login sukses! UID: ${user.uid}`)
+                
+                // Cek data di Firestore
+                const userDoc = await getDoc(doc(db, "users", user.uid))
+                
+                if (userDoc.exists()) {
+                    const userData = userDoc.data()
+                    log(`✅ Data ditemukan di Firestore:`)
+                    log(`   - Nama: ${userData.nama}`)
+                    log(`   - Role: ${userData.role}`)
+                    log(`   - Email: ${userData.email}`)
+                    
+                    document.getElementById('loginResult').innerHTML = `
+                        <div class="success">
+                            ✅ LOGIN BERHASIL!<br>
+                            Nama: ${userData.nama}<br>
+                            Role: ${userData.role}<br>
+                            UID: ${user.uid}
+                        </div>
+                    `
+                } else {
+                    log(`❌ Data TIDAK ditemukan di Firestore untuk UID: ${user.uid}`)
+                    document.getElementById('loginResult').innerHTML = `
+                        <div class="error">
+                            ⚠️ Login sukses tapi data user TIDAK ADA di Firestore!<br>
+                            UID: ${user.uid}
+                        </div>
+                    `
+                }
+                
+            } catch (error) {
+                log(`❌ Login gagal: ${error.message}`)
+                document.getElementById('loginResult').innerHTML = `<span class="error">❌ ${error.message}</span>`
+            }
+        }
+        
+        window.cekUser = async function() {
+            const email = document.getElementById('cekEmail').value
+            
+            log(`🔍 Mencari user dengan email: ${email}`)
+            
+            try {
+                // Cari di Authentication (tidak bisa langsung, tapi kita bisa coba login)
+                log('⚠️ Tidak bisa cek Authentication langsung dari client')
+                
+                // Cari di Firestore
+                const q = query(collection(db, "users"), where("email", "==", email))
+                const snapshot = await getDocs(q)
+                
+                if (!snapshot.empty) {
+                    snapshot.forEach(doc => {
+                        const data = doc.data()
+                        log(`✅ Ditemukan di Firestore:`)
+                        log(`   - Document ID: ${doc.id}`)
+                        log(`   - UID: ${data.uid}`)
+                        log(`   - Nama: ${data.nama}`)
+                        log(`   - Role: ${data.role}`)
+                        
+                        document.getElementById('userResult').innerHTML = `
+                            <div class="success">
+                                ✅ USER DITEMUKAN!<br>
+                                Nama: ${data.nama}<br>
+                                Role: ${data.role}<br>
+                                UID: ${data.uid}<br>
+                                Document ID: ${doc.id}
+                            </div>
+                        `
+                    })
+                } else {
+                    log(`❌ User dengan email ${email} TIDAK ditemukan di Firestore`)
+                    document.getElementById('userResult').innerHTML = '<span class="error">❌ User tidak ditemukan di Firestore</span>'
+                }
+                
+            } catch (error) {
+                log(`❌ Error: ${error.message}`)
+                document.getElementById('userResult').innerHTML = `<span class="error">❌ ${error.message}</span>`
+            }
+        }
+    </script>
+</body>
+</html>

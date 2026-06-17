@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Login - Lengkap</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #EE2737 0%, #BF1E2B 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+        }
+        
+        h1 {
+            color: #EE2737;
+            margin-bottom: 20px;
+        }
+        
+        .card {
+            background: #F8F9FA;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #2C3E50;
+        }
+        
+        input, select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #E0E0E0;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        
+        button {
+            background: #EE2737;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        
+        button:hover {
+            background: #BF1E2B;
+        }
+        
+        .btn-secondary {
+            background: #3498DB;
+        }
+        
+        .btn-success {
+            background: #27AE60;
+        }
+        
+        .log-area {
+            background: #2C3E50;
+            color: #ECF0F1;
+            padding: 20px;
+            border-radius: 10px;
+            font-family: monospace;
+            height: 300px;
+            overflow-y: auto;
+            margin-top: 20px;
+            font-size: 12px;
+        }
+        
+        .log-entry {
+            margin-bottom: 5px;
+            border-bottom: 1px solid #34495E;
+            padding-bottom: 3px;
+        }
+        
+        .log-success {
+            color: #2ECC71;
+        }
+        
+        .log-error {
+            color: #E74C3C;
+        }
+        
+        .log-warning {
+            color: #F39C12;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            margin: 5px;
+        }
+        
+        .status-success {
+            background: #E8F5E9;
+            color: #27AE60;
+        }
+        
+        .status-error {
+            background: #FFEBEE;
+            color: #E74C3C;
+        }
+        
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.7);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+        
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #EE2737;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+        
+        th {
+            background: #EE2737;
+            color: white;
+            padding: 8px;
+        }
+        
+        td {
+            padding: 8px;
+            border-bottom: 1px solid #E0E0E0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 DEBUG LOGIN LENGKAP</h1>
+        
+        <!-- Step 1: Test Firebase Connection -->
+        <div class="card">
+            <h3>Step 1: Test Koneksi Firebase</h3>
+            <button onclick="testConnection()">🔌 Test Connection</button>
+            <button onclick="testAuth()" class="btn-secondary">👤 Test Auth</button>
+            <button onclick="testFirestore()" class="btn-success">📁 Test Firestore</button>
+            <div id="connectionResult" style="margin-top: 10px;"></div>
+        </div>
+        
+        <!-- Step 2: Coba Login Manual -->
+        <div class="card">
+            <h3>Step 2: Coba Login Manual</h3>
+            <div class="form-group">
+                <label>Email:</label>
+                <input type="email" id="loginEmail" placeholder="Email">
+            </div>
+            <div class="form-group">
+                <label>Password:</label>
+                <input type="password" id="loginPassword" placeholder="Password">
+            </div>
+            <button onclick="testLogin()">🔑 TEST LOGIN</button>
+            <button onclick="testLoginWithDefault()" class="btn-secondary">🔑 Login dengan 123456</button>
+            <div id="loginResult" style="margin-top: 10px;"></div>
+        </div>
+        
+        <!-- Step 3: Cek Data User -->
+        <div class="card">
+            <h3>Step 3: Cek Data User</h3>
+            <div class="form-group">
+                <label>Cari Email:</label>
+                <input type="email" id="searchEmail" placeholder="Masukkan email">
+            </div>
+            <button onclick="cekUserDiFirestore()">🔍 CEK DI FIRESTORE</button>
+            <button onclick="cekUserViaLogin()" class="btn-secondary">🔍 CEK VIA LOGIN (AUTH)</button>
+            <div id="userResult" style="margin-top: 10px;"></div>
+        </div>
+        
+        <!-- Step 4: Daftar User -->
+        <div class="card">
+            <h3>Step 4: Daftar User (Firestore vs Auth)</h3>
+            <button onclick="loadAllUsers()">📋 LOAD SEMUA USER</button>
+            <div id="userTableContainer" style="margin-top: 15px;"></div>
+        </div>
+        
+        <!-- Step 5: Reset Password -->
+        <div class="card">
+            <h3>Step 5: Reset Password</h3>
+            <button onclick="resetPasswordPrompt()" class="btn-warning" style="background: #F39C12;">🔄 RESET PASSWORD USER</button>
+        </div>
+        
+        <!-- Log Area -->
+        <div class="log-area" id="logArea">
+            <div class="log-entry">[System] Debug login siap digunakan...</div>
+        </div>
+    </div>
+    
+    <div class="loading-overlay" id="loading">
+        <div class="loading-spinner"></div>
+        <p style="color: white; margin-top: 20px;">Memproses...</p>
+    </div>
+    
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js"
+        import { 
+            getAuth, 
+            signInWithEmailAndPassword, 
+            fetchSignInMethodsForEmail,
+            sendPasswordResetEmail
+        } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js"
+        import { 
+            getFirestore, 
+            collection, 
+            query, 
+            where, 
+            getDocs,
+            doc,
+            getDoc,
+            updateDoc
+        } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js"
+        
+        // ========== KONFIGURASI FIREBASE ==========
+ const firebaseConfig = {
+  apiKey: "AIzaSyCPANSke88xjUP0Lqpl2PoHSDu-xYtfAkQ",
+  authDomain: "presensi-fasilitator.firebaseapp.com",
+  projectId: "presensi-fasilitator",
+  storageBucket: "presensi-fasilitator.firebasestorage.app",
+  messagingSenderId: "317527501418",
+  appId: "1:317527501418:web:cdefb307e227796479f813"
+};
+        
+        // Inisialisasi
+        const app = initializeApp(firebaseConfig)
+        const auth = getAuth(app)
+        const db = getFirestore(app)
+        
+        // ========== FUNGSI LOG ==========
+        function addLog(message, type = 'info') {
+            const logArea = document.getElementById('logArea')
+            const entry = document.createElement('div')
+            entry.className = `log-entry log-${type}`
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`
+            logArea.appendChild(entry)
+            logArea.scrollTop = logArea.scrollHeight
+            console.log(`[${type}] ${message}`)
+        }
+        
+        // ========== SHOW LOADING ==========
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'flex' : 'none'
+        }
+        
+        // ========== TEST CONNECTION ==========
+        window.testConnection = function() {
+            addLog('🔌 Testing Firebase connection...', 'info')
+            
+            try {
+                if (app) {
+                    addLog('✅ Firebase app initialized', 'success')
+                    document.getElementById('connectionResult').innerHTML = '<span class="status-badge status-success">✅ Firebase OK</span>'
+                } else {
+                    throw new Error('App not initialized')
+                }
+            } catch (error) {
+                addLog(`❌ Connection error: ${error.message}`, 'error')
+                document.getElementById('connectionResult').innerHTML = `<span class="status-badge status-error">❌ Error</span>`
+            }
+        }
+        
+        // ========== TEST AUTH ==========
+        window.testAuth = function() {
+            addLog('👤 Testing Authentication...', 'info')
+            
+            try {
+                if (auth) {
+                    addLog('✅ Auth initialized', 'success')
+                    document.getElementById('connectionResult').innerHTML += '<br><span class="status-badge status-success">✅ Auth OK</span>'
+                }
+            } catch (error) {
+                addLog(`❌ Auth error: ${error.message}`, 'error')
+            }
+        }
+        
+        // ========== TEST FIRESTORE ==========
+        window.testFirestore = async function() {
+            addLog('📁 Testing Firestore...', 'info')
+            
+            try {
+                const testQuery = await getDocs(collection(db, 'users'))
+                addLog(`✅ Firestore OK. ${testQuery.size} dokumen di users`, 'success')
+                document.getElementById('connectionResult').innerHTML += '<br><span class="status-badge status-success">✅ Firestore OK</span>'
+            } catch (error) {
+                addLog(`❌ Firestore error: ${error.message}`, 'error')
+            }
+        }
+        
+        // ========== TEST LOGIN ==========
+        window.testLogin = async function() {
+            const email = document.getElementById('loginEmail').value.trim()
+            const password = document.getElementById('loginPassword').value
+            
+            if (!email) {
+                alert('Masukkan email!')
+                return
+            }
+            
+            if (!password) {
+                alert('Masukkan password!')
+                return
+            }
+            
+            addLog(`🔑 Mencoba login dengan email: ${email}`, 'info')
+            showLoading(true)
+            
+            try {
+                const userCredential = await signInWithEmailAndPassword(auth, email, password)
+                const user = userCredential.user
+                
+                addLog(`✅ LOGIN BERHASIL!`, 'success')
+                addLog(`   UID: ${user.uid}`, 'success')
+                addLog(`   Email: ${user.email}`, 'success')
+                
+                // Cek di Firestore
+                const userDoc = await getDoc(doc(db, "users", user.uid))
+                
+                if (userDoc.exists()) {
+                    const userData = userDoc.data()
+                    addLog(`✅ Data di Firestore:`, 'success')
+                    addLog(`   - Nama: ${userData.nama || '-'}`, 'success')
+                    addLog(`   - Role: ${userData.role || '-'}`, 'success')
+                    
+                    document.getElementById('loginResult').innerHTML = `
+                        <div class="status-badge status-success">✅ LOGIN BERHASIL</div><br>
+                        Email: ${user.email}<br>
+                        Nama: ${userData.nama || '-'}<br>
+                        Role: ${userData.role || '-'}<br>
+                        UID: ${user.uid}
+                    `
+                } else {
+                    addLog(`⚠️ User tidak ditemukan di Firestore!`, 'warning')
+                    document.getElementById('loginResult').innerHTML = `
+                        <div class="status-badge status-warning">⚠️ Login sukses tapi tidak ada data di Firestore</div>
+                    `
+                }
+                
+            } catch (error) {
+                addLog(`❌ Login gagal: ${error.message}`, 'error')
+                
+                let errorMessage = 'Login gagal! '
+                switch (error.code) {
+                    case 'auth/user-not-found':
+                        errorMessage = '❌ User tidak ditemukan di Authentication'
+                        break
+                    case 'auth/wrong-password':
+                        errorMessage = '❌ Password salah'
+                        break
+                    case 'auth/invalid-email':
+                        errorMessage = '❌ Format email salah'
+                        break
+                    default:
+                        errorMessage = `❌ ${error.message}`
+                }
+                
+                document.getElementById('loginResult').innerHTML = `
+                    <div class="status-badge status-error">${errorMessage}</div>
+                `
+            } finally {
+                showLoading(false)
+            }
+        }
+        
+        // ========== TEST LOGIN DENGAN DEFAULT PASSWORD ==========
+        window.testLoginWithDefault = async function() {
+            const email = document.getElementById('loginEmail').value.trim()
+            if (!email) {
+                alert('Masukkan email!')
+                return
+            }
+            
+            document.getElementById('loginPassword').value = '123456'
+            await testLogin()
+        }
+        
+        // ========== CEK USER DI FIRESTORE ==========
+        window.cekUserDiFirestore = async function() {
+            const email = document.getElementById('searchEmail').value.trim()
+            
+            if (!email) {
+                alert('Masukkan email!')
+                return
+            }
+            
+            addLog(`🔍 Mencari user di Firestore: ${email}`, 'info')
+            showLoading(true)
+            
+            try {
+                const q = query(collection(db, "users"), where("email", "==", email))
+                const snapshot = await getDocs(q)
+                
+                if (!snapshot.empty) {
+                    snapshot.forEach(doc => {
+                        const data = doc.data()
+                        addLog(`✅ DITEMUKAN di Firestore:`, 'success')
+                        addLog(`   - Document ID: ${doc.id}`, 'success')
+                        addLog(`   - UID: ${data.uid}`, 'success')
+                        addLog(`   - Nama: ${data.nama}`, 'success')
+                        addLog(`   - Role: ${data.role}`, 'success')
+                        addLog(`   - Device ID: ${data.deviceId || '-'}`, 'info')
+                        
+                        document.getElementById('userResult').innerHTML = `
+                            <div class="status-badge status-success">✅ DITEMUKAN DI FIRESTORE</div><br>
+                            Nama: ${data.nama}<br>
+                            Role: ${data.role}<br>
+                            UID: ${data.uid}<br>
+                            Device: ${data.deviceId || '-'}
+                        `
+                    })
+                } else {
+                    addLog(`❌ TIDAK ditemukan di Firestore`, 'error')
+                    document.getElementById('userResult').innerHTML = '<div class="status-badge status-error">❌ TIDAK DITEMUKAN</div>'
+                }
+                
+            } catch (error) {
+                addLog(`❌ Error: ${error.message}`, 'error')
+            } finally {
+                showLoading(false)
+            }
+        }
+        
+        // ========== CEK USER VIA LOGIN (AUTH) ==========
+        window.cekUserViaLogin = async function() {
+            const email = document.getElementById('searchEmail').value.trim()
+            
+            if (!email) {
+                alert('Masukkan email!')
+                return
+            }
+            
+            addLog(`🔍 Mencari user via Authentication: ${email}`, 'info')
+            
+            try {
+                const methods = await fetchSignInMethodsForEmail(auth, email)
+                
+                if (methods.length > 0) {
+                    addLog(`✅ DITEMUKAN di Authentication!`, 'success')
+                    addLog(`   Metode: ${methods.join(', ')}`, 'success')
+                    
+                    document.getElementById('userResult').innerHTML = `
+                        <div class="status-badge status-success">✅ DITEMUKAN DI AUTH</div><br>
+                        Email: ${email}<br>
+                        Metode: ${methods.join(', ')}
+                    `
+                } else {
+                    addLog(`❌ TIDAK ditemukan di Authentication`, 'error')
+                    document.getElementById('userResult').innerHTML = '<div class="status-badge status-error">❌ TIDAK DITEMUKAN DI AUTH</div>'
+                }
+                
+            } catch (error) {
+                addLog(`❌ Error: ${error.message}`, 'error')
+            }
+        }
+        
+        // ========== LOAD SEMUA USER ==========
+        window.loadAllUsers = async function() {
+            addLog('📋 Memuat semua user...', 'info')
+            showLoading(true)
+            
+            try {
+                // Ambil dari Firestore
+                const firestoreSnap = await getDocs(collection(db, "users"))
+                const firestoreUsers = []
+                firestoreSnap.forEach(doc => {
+                    const data = doc.data()
+                    firestoreUsers.push({
+                        email: data.email,
+                        nama: data.nama,
+                        role: data.role,
+                        uid: data.uid,
+                        deviceId: data.deviceId
+                    })
+                })
+                
+                addLog(`✅ Firestore: ${firestoreUsers.length} user`, 'success')
+                
+                // Tampilkan tabel
+                let html = `
+                    <table>
+                        <tr>
+                            <th>No</th>
+                            <th>Email</th>
+                            <th>Nama</th>
+                            <th>Role</th>
+                            <th>Device ID</th>
+                            <th>Aksi</th>
+                        </tr>
+                `
+                
+                firestoreUsers.forEach((user, index) => {
+                    html += `
+                        <tr>
+                            <td>${index + 1}</td>
+                            <td>${user.email || '-'}</td>
+                            <td>${user.nama || '-'}</td>
+                            <td>${user.role || '-'}</td>
+                            <td>${user.deviceId ? '📱' : '-'}</td>
+                            <td>
+                                <button onclick="resetDeviceForUser('${user.uid}')" style="font-size:10px; padding:3px 5px;">Reset Device</button>
+                            </td>
+                        </tr>
+                    `
+                })
+                
+                html += '</table>'
+                document.getElementById('userTableContainer').innerHTML = html
+                
+            } catch (error) {
+                addLog(`❌ Error: ${error.message}`, 'error')
+            } finally {
+                showLoading(false)
+            }
+        }
+        
+        // ========== RESET DEVICE ==========
+        window.resetDeviceForUser = async function(uid) {
+            if (!confirm('Reset device untuk user ini?')) return
+            
+            try {
+                await updateDoc(doc(db, "users", uid), {
+                    deviceId: null
+                })
+                addLog(`✅ Device direset untuk UID: ${uid}`, 'success')
+                loadAllUsers()
+            } catch (error) {
+                addLog(`❌ Error: ${error.message}`, 'error')
+            }
+        }
+        
+        // ========== RESET PASSWORD ==========
+        window.resetPasswordPrompt = function() {
+            const email = prompt('Masukkan email user yang akan direset passwordnya:')
+            if (!email) return
+            
+            resetPassword(email)
+        }
+        
+        async function resetPassword(email) {
+            try {
+                await sendPasswordResetEmail(auth, email)
+                addLog(`✅ Email reset password dikirim ke: ${email}`, 'success')
+                alert(`✅ Email reset password telah dikirim ke ${email}\n\nCek inbox/spam folder.`)
+            } catch (error) {
+                addLog(`❌ Gagal reset password: ${error.message}`, 'error')
+                alert(`❌ Gagal: ${error.message}`)
+            }
+        }
+        
+        // Auto load saat halaman dibuka
+        setTimeout(() => {
+            testConnection()
+        }, 500)
+    </script>
+</body>
+</html>

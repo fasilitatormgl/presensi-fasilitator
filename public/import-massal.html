@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auto Import User - Authentication & Firestore</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #EE2737 0%, #BF1E2B 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+        }
+        
+        h1 {
+            color: #EE2737;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            color: #7F8C8D;
+            margin-bottom: 30px;
+        }
+        
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .feature-card {
+            background: #F8F9FA;
+            border-radius: 15px;
+            padding: 25px;
+            border-left: 4px solid #3498DB;
+        }
+        
+        .feature-card h3 {
+            color: #2C3E50;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .stats-container {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            border: 1px solid #E0E0E0;
+        }
+        
+        .stat-value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #EE2737;
+        }
+        
+        .stat-label {
+            color: #7F8C8D;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+        
+        .upload-area {
+            border: 3px dashed #EE2737;
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 20px;
+            cursor: pointer;
+            background: #FFF5F5;
+            transition: all 0.3s;
+        }
+        
+        .upload-area:hover {
+            background: #FFE5E5;
+        }
+        
+        .upload-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+        
+        .file-info {
+            background: #F8F9FA;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        
+        .progress-container {
+            background: #F8F9FA;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        
+        .progress-bar {
+            height: 20px;
+            background: #E0E0E0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 15px 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: #EE2737;
+            width: 0%;
+            transition: width 0.3s;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 15px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        
+        .btn-primary {
+            background: #EE2737;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 30px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            flex: 1;
+        }
+        
+        .btn-success {
+            background: #27AE60;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 30px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            flex: 1;
+        }
+        
+        .btn-warning {
+            background: #F39C12;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 30px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            flex: 1;
+        }
+        
+        .btn-info {
+            background: #3498DB;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 30px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            flex: 1;
+        }
+        
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+        
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+        
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        
+        input:checked + .toggle-slider {
+            background-color: #EE2737;
+        }
+        
+        input:checked + .toggle-slider:before {
+            transform: translateX(26px);
+        }
+        
+        .setting-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 15px;
+            background: white;
+            border-radius: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .log-area {
+            background: #2C3E50;
+            color: #ECF0F1;
+            padding: 20px;
+            border-radius: 10px;
+            font-family: monospace;
+            height: 200px;
+            overflow-y: auto;
+            margin-top: 20px;
+            font-size: 12px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            font-size: 13px;
+        }
+        
+        th {
+            background: #EE2737;
+            color: white;
+            padding: 10px;
+            text-align: left;
+        }
+        
+        td {
+            padding: 10px;
+            border-bottom: 1px solid #E0E0E0;
+        }
+        
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.7);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+        
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #EE2737;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 AUTO IMPORT USER</h1>
+        <div class="subtitle">Import otomatis ke Authentication & Firestore + Manajemen 1 Device 1 Akun</div>
+        
+        <!-- Stats -->
+        <div class="stats-container">
+            <div class="stat-card">
+                <div class="stat-value" id="statTotal">0</div>
+                <div class="stat-label">Total User</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="statAuth">0</div>
+                <div class="stat-label">Di Authentication</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="statFirestore">0</div>
+                <div class="stat-label">Di Firestore</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="statDevice">0</div>
+                <div class="stat-label">Device Terdaftar</div>
+            </div>
+        </div>
+        
+        <!-- Fitur 1 Device 1 Akun -->
+        <div class="feature-grid">
+            <div class="feature-card">
+                <h3>🔒 FITUR 1 DEVICE 1 AKUN</h3>
+                <div class="setting-item">
+                    <div>
+                        <strong>Aktifkan fitur 1 Device 1 Akun</strong>
+                        <p style="font-size: 12px; color: #7F8C8D;">Mencegah user login dari device berbeda</p>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="deviceCheckToggle" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <div class="setting-item">
+                    <div>
+                        <strong>Mode Ketat</strong>
+                        <p style="font-size: 12px; color: #7F8C8D;">Block langsung jika device berbeda</p>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="strictModeToggle">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <button class="btn-info" style="width: 100%; margin-top: 10px;" onclick="resetAllDevices()">🔄 RESET SEMUA DEVICE</button>
+            </div>
+            
+            <div class="feature-card">
+                <h3>📥 IMPORT AUTO</h3>
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-icon">📂</div>
+                    <div class="upload-text">Klik atau drag & drop file Excel</div>
+                    <div class="upload-hint">Format: .xlsx atau .xls</div>
+                </div>
+                <input type="file" id="fileInput" accept=".xlsx,.xls" style="display: none;">
+                <div class="file-info" id="fileInfo"></div>
+            </div>
+        </div>
+        
+        <!-- Tombol Aksi -->
+        <div class="button-group">
+            <button class="btn-primary" id="startImport" disabled>🚀 MULAI AUTO IMPORT</button>
+            <button class="btn-success" onclick="downloadTemplate()">📋 DOWNLOAD TEMPLATE</button>
+            <button class="btn-info" onclick="checkStatus()">🔍 CEK STATUS USER</button>
+            <button class="btn-warning" onclick="fixMismatchUsers()">🔧 FIX USER MISMATCH</button>
+        </div>
+        
+        <!-- Progress -->
+        <div class="progress-container" id="progressContainer">
+            <h4>⏳ PROGRESS IMPORT</h4>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <div id="progressStatus">Menunggu...</div>
+        </div>
+        
+        <!-- Tabel User -->
+        <div id="tableContainer" style="margin-top: 30px;">
+            <h3>📋 DAFTAR USER</h3>
+            <div style="overflow-x: auto;">
+                <table id="userTable">
+                    <thead>
+                        <tr>
+                            <th>No</th>
+                            <th>Email</th>
+                            <th>Nama</th>
+                            <th>Role</th>
+                            <th>Auth</th>
+                            <th>Firestore</th>
+                            <th>Device ID</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="userTableBody">
+                        <tr>
+                            <td colspan="8" style="text-align: center;">Klik "CEK STATUS USER" untuk memuat data</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- Log -->
+        <div class="log-area" id="logArea">
+            <div>[System] Auto Import siap digunakan...</div>
+        </div>
+    </div>
+    
+    <div class="loading-overlay" id="loading">
+        <div class="loading-spinner"></div>
+        <p style="color: white; margin-top: 20px;">Memproses...</p>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js"
+        import { 
+            getAuth, 
+            createUserWithEmailAndPassword, 
+            fetchSignInMethodsForEmail,
+            signInWithEmailAndPassword
+        } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js"
+        import { 
+            getFirestore, 
+            collection, 
+            addDoc, 
+            getDocs, 
+            query, 
+            where, 
+            doc, 
+            updateDoc,
+            deleteDoc,
+            setDoc
+        } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js"
+        
+        // ========== KONFIGURASI FIREBASE ==========
+const firebaseConfig = {
+  apiKey: "AIzaSyCPANSke88xjUP0Lqpl2PoHSDu-xYtfAkQ",
+  authDomain: "presensi-fasilitator.firebaseapp.com",
+  projectId: "presensi-fasilitator",
+  storageBucket: "presensi-fasilitator.firebasestorage.app",
+  messagingSenderId: "317527501418",
+  appId: "1:317527501418:web:cdefb307e227796479f813"
+};
+        
+        const app = initializeApp(firebaseConfig)
+        const auth = getAuth(app)
+        const db = getFirestore(app)
+        
+        // ========== VARIABEL GLOBAL ==========
+        let selectedFile = null
+        let workbook = null
+        let importActive = false
+        let usersFromExcel = []
+        let deviceCheckEnabled = true // Default: aktif
+        
+        // ========== FUNGSI LOG ==========
+        function addLog(message, type = 'info') {
+            const logArea = document.getElementById('logArea')
+            const entry = document.createElement('div')
+            entry.style.color = type === 'error' ? '#E74C3C' : (type === 'success' ? '#2ECC71' : (type === 'warning' ? '#F39C12' : '#ECF0F1'))
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`
+            logArea.appendChild(entry)
+            logArea.scrollTop = logArea.scrollHeight
+        }
+        
+        // ========== LOADING ==========
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'flex' : 'none'
+        }
+        
+        // ========== UPDATE STATS ==========
+        async function updateStats() {
+            try {
+                // Total dari Firestore
+                const firestoreSnap = await getDocs(collection(db, "users"))
+                document.getElementById('statFirestore').textContent = firestoreSnap.size
+                
+                // Yang punya device
+                let deviceCount = 0
+                firestoreSnap.forEach(doc => {
+                    if (doc.data().deviceId) deviceCount++
+                })
+                document.getElementById('statDevice').textContent = deviceCount
+                
+                // Total user (estimasi dari Auth - tidak bisa diambil langsung)
+                // Kita tampilkan dari Firestore dulu
+                document.getElementById('statTotal').textContent = firestoreSnap.size
+                
+            } catch (error) {
+                console.error('Error update stats:', error)
+            }
+        }
+        
+        // ========== HANDLE FILE UPLOAD ==========
+        const uploadArea = document.getElementById('uploadArea')
+        const fileInput = document.getElementById('fileInput')
+        
+        uploadArea.addEventListener('click', () => fileInput.click())
+        
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault()
+            uploadArea.style.background = '#FFE5E5'
+        })
+        
+        uploadArea.addEventListener('dragleave', (e) => {
+            e.preventDefault()
+            uploadArea.style.background = '#FFF5F5'
+        })
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault()
+            uploadArea.style.background = '#FFF5F5'
+            const file = e.dataTransfer.files[0]
+            if (file) handleFileSelect(file)
+        })
+        
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0]
+            if (file) handleFileSelect(file)
+        })
+        
+        // ========== HANDLE FILE SELECT ==========
+        async function handleFileSelect(file) {
+            if (!file.name.match(/\.(xlsx|xls)$/)) {
+                alert('❌ Format file harus .xlsx atau .xls')
+                return
+            }
+            
+            selectedFile = file
+            document.getElementById('fileInfo').style.display = 'block'
+            document.getElementById('fileInfo').innerHTML = `
+                <strong>📁 File:</strong> ${file.name}<br>
+                <strong>📊 Ukuran:</strong> ${(file.size / 1024).toFixed(2)} KB
+            `
+            
+            // Baca workbook
+            const data = await file.arrayBuffer()
+            workbook = XLSX.read(data, { type: 'array' })
+            
+            if (workbook.SheetNames.includes('USER')) {
+                const sheet = workbook.Sheets['USER']
+                usersFromExcel = XLSX.utils.sheet_to_json(sheet)
+                document.getElementById('fileInfo').innerHTML += `<br><strong>📋 Total user:</strong> ${usersFromExcel.length}`
+            }
+            
+            document.getElementById('startImport').disabled = false
+        }
+        
+        // ========== CEK STATUS USER ==========
+        window.checkStatus = async function() {
+            showLoading(true)
+            addLog('🔍 Mengecek status semua user...')
+            
+            try {
+                const firestoreSnap = await getDocs(collection(db, "users"))
+                let tableHtml = ''
+                let index = 1
+                
+                for (const userDoc of firestoreSnap.docs) {
+                    const data = userDoc.data()
+                    
+                    // Cek di Authentication
+                    let authStatus = '❌'
+                    try {
+                        const methods = await fetchSignInMethodsForEmail(auth, data.email)
+                        authStatus = methods.length > 0 ? '✅' : '❌'
+                    } catch (e) {
+                        authStatus = '❌'
+                    }
+                    
+                    const deviceStatus = data.deviceId ? '📱' : '📱-'
+                    
+                    tableHtml += `<tr>
+                        <td>${index++}</td>
+                        <td>${data.email || '-'}</td>
+                        <td>${data.nama || '-'}</td>
+                        <td>${data.role || '-'}</td>
+                        <td style="color: ${authStatus === '✅' ? '#27AE60' : '#E74C3C'}">${authStatus}</td>
+                        <td style="color: #27AE60;">✅</td>
+                        <td>${deviceStatus}</td>
+                        <td>${data.deviceId ? 'Terdaftar' : 'Kosong'}</td>
+                    </tr>`
+                }
+                
+                document.getElementById('userTableBody').innerHTML = tableHtml
+                addLog(`✅ Selesai! Total: ${firestoreSnap.size} user`, 'success')
+                
+                await updateStats()
+                
+            } catch (error) {
+                addLog(`❌ Error: ${error.message}`, 'error')
+            } finally {
+                showLoading(false)
+            }
+        }
+        
+        // ========== AUTO IMPORT ==========
+        document.getElementById('startImport').addEventListener('click', autoImport)
+        
+        async function autoImport() {
+            if (!selectedFile || !workbook || importActive) return
+            
+            importActive = true
+            showLoading(true)
+            document.getElementById('progressContainer').style.display = 'block'
+            document.getElementById('startImport').disabled = true
+            
+            let result = { success: 0, failed: 0, skipped: 0 }
+            
+            try {
+                if (!workbook.SheetNames.includes('USER')) {
+                    addLog('❌ Sheet USER tidak ditemukan!', 'error')
+                    return
+                }
+                
+                const sheet = workbook.Sheets['USER']
+                const users = XLSX.utils.sheet_to_json(sheet)
+                
+                addLog(`👥 Memulai auto import ${users.length} user...`, 'info')
+                
+                for (let i = 0; i < users.length; i++) {
+                    const user = users[i]
+                    
+                    try {
+                        // Update progress
+                        const progress = (i / users.length) * 100
+                        document.getElementById('progressFill').style.width = `${progress}%`
+                        document.getElementById('progressStatus').textContent = `Import ${i + 1}/${users.length}: ${user.email}`
+                        
+                        // Validasi data
+                        if (!user.nama || !user.email || !user.password || !user.role) {
+                            addLog(`⚠️ Data tidak lengkap: ${user.email || 'baris ' + (i+2)}`, 'warning')
+                            result.skipped++
+                            continue
+                        }
+                        
+                        // Cek di Authentication
+                        const methods = await fetchSignInMethodsForEmail(auth, user.email)
+                        
+                        if (methods.length > 0) {
+                            addLog(`⏭️ Email sudah terdaftar: ${user.email} - Lewati`, 'warning')
+                            result.skipped++
+                            continue
+                        }
+                        
+                        // BUAT USER DI AUTHENTICATION
+                        const userCredential = await createUserWithEmailAndPassword(
+                            auth,
+                            user.email,
+                            user.password
+                        )
+                        
+                        addLog(`✅ User dibuat di Auth: ${user.email}`, 'success')
+                        
+                        // FORMAT DATA LENGKAP
+                        const userData = {
+                            uid: userCredential.user.uid,
+                            nama: user.nama,
+                            email: user.email,
+                            role: user.role,
+                            kelurahan: user.kelurahan || null,
+                            deviceId: null,
+                            deviceCheckEnabled: deviceCheckEnabled, // Simpan pengaturan
+                            deviceResetAt: new Date(),
+                            lastResetBy: "auto-import",
+                            lastSeen: new Date(),
+                            createdAt: new Date()
+                        }
+                        
+                        // SIMPAN KE FIRESTORE
+                        await addDoc(collection(db, "users"), userData)
+                        
+                        addLog(`✅ User disimpan ke Firestore: ${user.email}`, 'success')
+                        result.success++
+                        
+                    } catch (error) {
+                        addLog(`❌ Error: ${user.email} - ${error.message}`, 'error')
+                        result.failed++
+                    }
+                    
+                    // Update stats
+                    document.getElementById('statUser').textContent = result.success
+                    
+                    // Jeda 500ms
+                    await new Promise(resolve => setTimeout(resolve, 500))
+                }
+                
+                // SELESAI
+                document.getElementById('progressFill').style.width = '100%'
+                document.getElementById('progressStatus').textContent = '✅ IMPORT SELESAI!'
+                
+                addLog('🎉 AUTO IMPORT SELESAI!', 'success')
+                addLog(`✅ Berhasil: ${result.success}`, 'success')
+                addLog(`❌ Gagal: ${result.failed}`, 'error')
+                addLog(`⏭️ Dilewati: ${result.skipped}`, 'warning')
+                
+                alert(`✅ IMPORT SELESAI!\n\nBerhasil: ${result.success}\nGagal: ${result.failed}\nDilewati: ${result.skipped}`)
+                
+                // Refresh status
+                await checkStatus()
+                
+            } catch (error) {
+                addLog(`❌ FATAL ERROR: ${error.message}`, 'error')
+                alert(`❌ Gagal: ${error.message}`)
+            } finally {
+                importActive = false
+                showLoading(false)
+                await updateStats()
+            }
+        }
+        
+        // ========== RESET SEMUA DEVICE ==========
+        window.resetAllDevices = async function() {
+            if (!confirm('⚠️ RESET SEMUA DEVICE?\n\nSemua user akan bisa login dari perangkat manapun.')) return
+            
+            showLoading(true)
+            addLog('🔄 Mereset semua device...', 'warning')
+            
+            try {
+                const adminUser = auth.currentUser
+                const adminEmail = adminUser ? adminUser.email : 'unknown'
+                
+                const snapshot = await getDocs(collection(db, "users"))
+                let count = 0
+                
+                for (const userDoc of snapshot.docs) {
+                    await updateDoc(doc(db, "users", userDoc.id), {
+                        deviceId: null,
+                        deviceResetAt: new Date(),
+                        lastResetBy: adminEmail
+                    })
+                    count++
+                    addLog(`✅ Reset: ${userDoc.data().email}`, 'success')
+                }
+                
+                addLog(`✅ ${count} user berhasil direset device!`, 'success')
+                alert(`✅ ${count} user direset!`)
+                await checkStatus()
+                
+            } catch (error) {
+                addLog(`❌ Error: ${error.message}`, 'error')
+                alert(`❌ Gagal: ${error.message}`)
+            } finally {
+                showLoading(false)
+            }
+        }
+        
+        // ========== FIX USER MISMATCH ==========
+        window.fixMismatchUsers = async function() {
+            if (!confirm('🔧 Perbaiki user yang mismatch (ada di Firestore tapi tidak di Auth)?')) return
+            
+            showLoading(true)
+            addLog('🔧 Memperbaiki user mismatch...', 'warning')
+            
+            try {
+                const firestoreSnap = await getDocs(collection(db, "users"))
+                let fixed = 0
+                
+                for (const userDoc of firestoreSnap.docs) {
+                    const data = userDoc.data()
+                    
+                    // Cek di Auth
+                    const methods = await fetchSignInMethodsForEmail(auth, data.email)
+                    
+                    if (methods.length === 0) {
+                        addLog(`⏳ User tidak di Auth: ${data.email}`, 'warning')
+                        
+                        // Buat ulang di Auth
+                        try {
+                            const userCredential = await createUserWithEmailAndPassword(
+                                auth,
+                                data.email,
+                                '123456' // Reset password ke 123456
+                            )
+                            
+                            // Update UID di Firestore
+                            await updateDoc(doc(db, "users", userDoc.id), {
+                                uid: userCredential.user.uid,
+                                deviceResetAt: new Date(),
+                                lastResetBy: 'fix-mismatch'
+                            })
+                            
+                            addLog(`✅ User diperbaiki: ${data.email} (password: 123456)`, 'success')
+                            fixed++
+                            
+                        } catch (createError) {
+                            addLog(`❌ Gagal buat ${data.email}: ${createError.message}`, 'error')
+                        }
+                        
+                        await new Promise(resolve => setTimeout(resolve, 500))
+                    }
+                }
+                
+                addLog(`✅ Selesai! ${fixed} user diperbaiki`, 'success')
+                alert(`✅ ${fixed} user diperbaiki!\n\nPassword: 123456`)
+                
+                await checkStatus()
+                
+            } catch (error) {
+                addLog(`❌ Error: ${error.message}`, 'error')
+            } finally {
+                showLoading(false)
+            }
+        }
+        
+        // ========== DOWNLOAD TEMPLATE ==========
+        window.downloadTemplate = function() {
+            const template = [
+                ['USER'],
+                ['nama', 'email', 'password', 'role', 'kelurahan'],
+                ['Budi Santoso', 'budi@fasilitator.com', '123456', 'user', 'Magelang Tengah'],
+                ['Siti Aminah', 'siti@fasilitator.com', '123456', 'user', 'Magelang Utara'],
+                ['Koordinator', 'koordinator@fasilitator.com', '123456', 'koordinator', ''],
+                ['Admin', 'admin@fasilitator.com', 'admin123', 'admin', '']
+            ]
+            
+            const wb = XLSX.utils.book_new()
+            const ws = XLSX.utils.aoa_to_sheet(template)
+            XLSX.utils.book_append_sheet(wb, ws, "USER")
+            XLSX.writeFile(wb, "template_import_user.xlsx")
+            
+            addLog('📋 Template berhasil didownload', 'success')
+        }
+        
+        // ========== TOGGLE DEVICE CHECK ==========
+        document.getElementById('deviceCheckToggle').addEventListener('change', function(e) {
+            deviceCheckEnabled = e.target.checked
+            addLog(`🔒 Fitur 1 Device 1 Akun: ${deviceCheckEnabled ? 'AKTIF' : 'NONAKTIF'}`, 'warning')
+            
+            // Simpan ke localStorage untuk persistensi
+            localStorage.setItem('deviceCheckEnabled', deviceCheckEnabled)
+        })
+        
+        // Load setting dari localStorage
+        const savedSetting = localStorage.getItem('deviceCheckEnabled')
+        if (savedSetting !== null) {
+            deviceCheckEnabled = savedSetting === 'true'
+            document.getElementById('deviceCheckToggle').checked = deviceCheckEnabled
+        }
+        
+        // ========== UPDATE DEVICE.JS ==========
+        // Fungsi ini akan dipanggil untuk mengupdate file device.js
+        window.updateDeviceCheckSetting = async function() {
+            addLog('📝 Setting device check telah diupdate', 'info')
+        }
+        
+        // Auto load status saat halaman dibuka
+        setTimeout(() => {
+            checkStatus()
+            updateStats()
+        }, 1000)
+    </script>
+</body>
+</html>
