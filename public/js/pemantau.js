@@ -125,7 +125,7 @@ window.addEventListener('load', async () => {
             userData = JSON.parse(storedData)
         }
         
-        if (!userData || userData.role !== 'Pemantau') {
+        if (!userData || userData.role !== 'pemantau') {
             window.location.href = "index.html"
             return
         }
