@@ -144,7 +144,7 @@ async function loadData() {
         usersSnap.forEach(doc => {
             const data = doc.data()
             // Ambil semua user kecuali admin
-            if (data.role !== 'admin') {
+             if (data.role !== 'admin' && data.role !== 'pemantau') {
                 allUsers.push({
                     id: doc.id,
                     uid: data.uid || doc.id,
