@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pemantau - Absensi Fasilitator</title>
+    <title>Pemantau - Monitoring Fasilitator</title>
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 </head>
@@ -12,7 +12,6 @@
         <div class="header-content">
             <div class="logo">MGL<span>Pemantau</span></div>
             <div class="header-right">
-                <div class="status-badge" id="statusBadge">⏳ Memuat...</div>
                 <button class="btn-logout" id="logoutBtn">
                     <span>🚪</span>
                     <span class="logout-text">Keluar</span>
@@ -26,32 +25,17 @@
         <div class="greeting-text">
             <div class="greeting-hello">Halo, Pemantau</div>
             <div class="greeting-name" id="userName">Pemantau</div>
-            <div class="greeting-role" id="userRole">Pemantau Fasilitator</div>
+            <div class="greeting-role" id="userRole">Pemantau - Monitoring</div>
             <div id="notifikasiStatusLokasi" style="margin: 15px 0; display: none;"></div>
         </div>
     </div>
     
     <div style="display: flex; margin: 10px; gap: 10px;">
-        <button class="btn-filter" id="tabRekap" style="flex: 1; background: #3498DB;" onclick="showTab('rekap')">📊 Rekap Absensi</button>
-    </div>
-        
-        
-        
-        <div class="card">
-            <div class="card-title">
-                <span class="card-icon">📍</span>
-                <h3>Info Presensi</h3>
-            </div>
-            <div style="padding: 15px; background: #FFF5F5; border-radius: 8px; border-left: 4px solid #F39C12;">
-                <p><strong>📋 Jika ada Error:</strong></p>
-                <p>✅ abaikan saja jika ada notif Terjadi Kesalahan - Gagal memuat dashboard pastikan lokasi aktif, karena belum sempat di betulin wkwk.</p>
-                <p>✅ langsung Klik Rekap Absensi.</p>
-                <p>✅ Pilih Bulanan / harian pilih bulan dan terapkan, bisa export juga ".</p>
-            </div>
-        </div>
+        <button class="btn-filter" id="tabHarian" style="flex: 1; background: #EE2737;" onclick="showTab('harian')">📅 Harian</button>
+        <button class="btn-filter" id="tabBulanan" style="flex: 1; background: #3498DB;" onclick="showTab('bulanan')">📊 Bulanan</button>
     </div>
     
-    <div id="tabRekapContent" style="display: none;">
+    <div id="tabHarianContent">
         <div class="stats-grid">
             <div class="stat-card">
                 <div class="stat-value" id="totalFasilitator">0</div>
@@ -74,64 +58,29 @@
         <div class="card">
             <div class="card-title">
                 <span class="card-icon">🔍</span>
-                <h3>Filter Rekap</h3>
-            </div>
-            
-            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                <button class="btn-filter" id="btnHarian" onclick="setMode('harian')" style="flex: 1; background: #EE2737;">📅 Harian</button>
-                <button class="btn-filter" id="btnBulanan" onclick="setMode('bulanan')" style="flex: 1; background: #3498DB;">📊 Bulanan</button>
+                <h3>Filter Rekap Harian</h3>
             </div>
             
             <div class="filter-group" style="margin-bottom: 10px;">
-                <select id="filterKelurahan" class="filter-select">
+                <select id="filterKelurahanHarian" class="filter-select">
                     <option value="">Semua Kelurahan</option>
                 </select>
             </div>
             
-            <div id="filterHarian">
-                <div class="filter-group">
-                    <input type="date" id="filterTanggal" class="filter-date">
-                    <button class="btn-filter" onclick="applyFilter()" style="background: #27AE60;">Terapkan</button>
-                    <button class="btn-reset" onclick="resetFilter()">Reset</button>
-                </div>
-            </div>
-            
-            <div id="filterBulanan" style="display: none;">
-                <div class="filter-group">
-                    <select id="filterBulan" class="filter-select">
-                        <option value="1">Januari</option>
-                        <option value="2">Februari</option>
-                        <option value="3">Maret</option>
-                        <option value="4">April</option>
-                        <option value="5">Mei</option>
-                        <option value="6">Juni</option>
-                        <option value="7">Juli</option>
-                        <option value="8">Agustus</option>
-                        <option value="9">September</option>
-                        <option value="10">Oktober</option>
-                        <option value="11">November</option>
-                        <option value="12">Desember</option>
-                    </select>
-                    <select id="filterTahun" class="filter-select">
-                        <option value="2026">2026</option>
-                        <option value="2027">2027</option>
-                    </select>
-                    <button class="btn-filter" onclick="applyFilter()" style="background: #27AE60;">Terapkan</button>
-                    <button class="btn-reset" onclick="resetFilter()">Reset</button>
-                </div>
+            <div class="filter-group">
+                <input type="date" id="filterTanggal" class="filter-date">
+                <button class="btn-filter" onclick="applyFilterHarian()" style="background: #27AE60;">Terapkan</button>
+                <button class="btn-reset" onclick="resetFilterHarian()">Reset</button>
             </div>
 
-            <div style="display: flex; gap: 10px; margin-top: 15px;">
-                <button class="btn-success" onclick="exportHarian()" style="flex: 1; background: #27AE60;">
-                    📥 Export Harian
-                </button>
-                <button class="btn-success" onclick="exportBulanan()" style="flex: 1; background: #27AE60;">
-                    📊 Export Bulanan
+            <div style="margin-top: 15px;">
+                <button class="btn-success" onclick="exportHarian()" style="width: 100%; background: #27AE60;">
+                    📥 Export Excel Harian
                 </button>
             </div>
         </div>
         
-        <div class="card" id="rekapHarian">
+        <div class="card">
             <div class="card-title">
                 <span class="card-icon">📋</span>
                 <h3>Rekap Harian</h3>
@@ -147,7 +96,6 @@
                             <th>Status</th>
                             <th>Waktu</th>
                             <th>Lokasi</th>
-                            
                         </tr>
                     </thead>
                     <tbody id="tableHarian">
@@ -156,8 +104,52 @@
                 </table>
             </div>
         </div>
+    </div>
+    
+    <div id="tabBulananContent" style="display: none;">
+        <div class="card">
+            <div class="card-title">
+                <span class="card-icon">🔍</span>
+                <h3>Filter Rekap Bulanan</h3>
+            </div>
+            
+            <div class="filter-group" style="margin-bottom: 10px;">
+                <select id="filterKelurahanBulanan" class="filter-select">
+                    <option value="">Semua Kelurahan</option>
+                </select>
+            </div>
+            
+            <div class="filter-group">
+                <select id="filterBulan" class="filter-select">
+                    <option value="1">Januari</option>
+                    <option value="2">Februari</option>
+                    <option value="3">Maret</option>
+                    <option value="4">April</option>
+                    <option value="5">Mei</option>
+                    <option value="6">Juni</option>
+                    <option value="7">Juli</option>
+                    <option value="8">Agustus</option>
+                    <option value="9">September</option>
+                    <option value="10">Oktober</option>
+                    <option value="11">November</option>
+                    <option value="12">Desember</option>
+                </select>
+                <select id="filterTahun" class="filter-select">
+                    <option value="2026">2026</option>
+                    <option value="2027">2027</option>
+                </select>
+                <button class="btn-filter" onclick="applyFilterBulanan()" style="background: #27AE60;">Terapkan</button>
+                <button class="btn-reset" onclick="resetFilterBulanan()">Reset</button>
+            </div>
+
+            <div style="margin-top: 15px;">
+                <button class="btn-success" onclick="exportBulanan()" style="width: 100%; background: #27AE60;">
+                    📊 Export Excel Bulanan
+                </button>
+            </div>
+        </div>
         
-        <div class="card" id="rekapBulanan" style="display: none;">
+        <div class="card">
             <div class="card-title">
                 <span class="card-icon">📊</span>
                 <h3>Rekap Bulanan</h3>
@@ -192,7 +184,7 @@
                         </tr>
                     </thead>
                     <tbody id="tableBulanan">
-                        <tr><td colspan="7" class="text-center">Memuat data...</td></tr>
+                        <tr><td colspan="6" class="text-center">Memuat data...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -217,7 +209,6 @@
         </div>
     </div>
     
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
     <script type="module" src="js/pemantau.js"></script>
 </body>
