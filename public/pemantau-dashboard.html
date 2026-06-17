@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Koordinator - Absensi Fasilitator</title>
+    <title>Pemantau - Absensi Fasilitator</title>
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 </head>
 <body>
     <div class="header">
         <div class="header-content">
-            <div class="logo">MGL<span>Koordinator</span></div>
+            <div class="logo">MGL<span>Pemantau</span></div>
             <div class="header-right">
                 <div class="status-badge" id="statusBadge">⏳ Memuat...</div>
                 <button class="btn-logout" id="logoutBtn">
@@ -24,33 +24,16 @@
     <div class="greeting-card">
         <div class="greeting-avatar" id="avatar">👤</div>
         <div class="greeting-text">
-            <div class="greeting-hello">Halo, Koordinator</div>
-            <div class="greeting-name" id="userName">Koordinator</div>
-            <div class="greeting-role" id="userRole">Koordinator Fasilitator</div>
+            <div class="greeting-hello">Halo, Pemantau</div>
+            <div class="greeting-name" id="userName">Pemantau</div>
+            <div class="greeting-role" id="userRole">Pemantau Fasilitator</div>
             <div id="notifikasiStatusLokasi" style="margin: 15px 0; display: none;"></div>
         </div>
     </div>
     
     <div style="display: flex; margin: 10px; gap: 10px;">
-        <button class="btn-filter" id="tabAbsensi" style="flex: 1; background: #EE2737;" onclick="showTab('absensi')">📍 Absensi</button>
-        <button class="btn-filter" id="tabRekap" style="flex: 1; background: #3498DB;" onclick="showTab('rekap')">📊 Rekap</button>
+        <button class="btn-filter" id="tabRekap" style="flex: 1; background: #3498DB;" onclick="showTab('rekap')">📊 Rekap Absensi</button>
     </div>
-    
-    <div id="tabAbsensiContent">
-        <div class="card">
-            <div class="card-title">
-                <span class="card-icon">📋</span>
-                <h3>Status Presensi Hari Ini</h3>
-            </div>
-            <div class="status-container">
-                <div class="status-icon" id="statusEmoji">⏰</div>
-                <div class="status-text" id="statusText">Memuat status...</div>
-                <div class="status-time" id="presensiTime"></div>
-                <button class="btn-presensi" id="btnPresensi">
-                    <span>📍</span> Presensi Sekarang
-                </button>
-            </div>
-        </div>
         
         <div class="card">
             <div class="card-title">
@@ -178,11 +161,11 @@
                             <th>Status</th>
                             <th>Waktu</th>
                             <th>Lokasi</th>
-                            <th>Aksi</th>
+                            
                         </tr>
                     </thead>
                     <tbody id="tableHarian">
-                        <tr><td colspan="7" class="text-center">Memuat data...</td></tr>
+                        <tr><td colspan="6" class="text-center">Memuat data...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -220,7 +203,6 @@
                             <th>Hadir</th>
                             <th>Total Hari</th>
                             <th>Persentase</th>
-                            <th>Aksi</th>
                         </tr>
                     </thead>
                     <tbody id="tableBulanan">
@@ -251,6 +233,6 @@
     
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
-    <script type="module" src="js/koordinator-dashboard.js"></script>
+    <script type="module" src="js/pemantau-dashboard.js"></script>
 </body>
 </html>
