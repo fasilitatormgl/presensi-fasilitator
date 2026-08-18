@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Authenticate Google Cloud
@@ -28,12 +28,12 @@ jobs:
         with:
           node-version: 22
 
-      - name: Check Node.js version
+      - name: Check Node
         run: |
-          node --version
-          npm --version
+          node -v
+          npm -v
 
-      - name: Install functions dependencies
+      - name: Install dependencies
         working-directory: functions
         run: npm install
 
@@ -44,14 +44,4 @@ jobs:
         run: firebase --version
 
       - name: Deploy Functions
-        run: |
-          firebase deploy \
-            --only functions \
-            --project presensi-fasilitator
-
-      - name: Get adminUserAction logs
-        if: always()
-        run: |
-          firebase functions:log \
-            --only adminUserAction \
-            --project presensi-fasilitator
+        run: firebase deploy --only functions --project presensi-fasilitator --debug
