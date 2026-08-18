@@ -1,289 +1,186 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Panel - Absensi Fasilitator MGL</title>
-
-    <link rel="stylesheet" href="css/style.css">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Panel - Absensi Fasilitator MGL</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+.admin-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.admin-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
+.admin-form input,.admin-form select{width:100%;box-sizing:border-box;padding:10px;border:1px solid #ddd;border-radius:8px}
+.admin-table{width:100%;border-collapse:collapse;min-width:850px}
+.admin-table th,.admin-table td{padding:8px;border-bottom:1px solid #eee;text-align:left;font-size:12px}
+.admin-table th{background:#f7f7f7}
+.admin-actions{display:flex;flex-wrap:wrap;gap:5px}
+.admin-actions button{border:0;border-radius:6px;padding:6px 9px;cursor:pointer}
+.btn-primary{background:#3498db;color:#fff}.btn-green{background:#27ae60;color:#fff}.btn-orange{background:#f39c12;color:#fff}.btn-red{background:#e74c3c;color:#fff}
+.switch-row{display:flex;gap:10px;align-items:center;padding:8px 0}
+.small-note{font-size:12px;color:#7f8c8d}
+</style>
 </head>
 <body>
+<div class="header">
+  <div class="header-content">
+    <div class="logo">MGL<span>Admin Panel</span></div>
+    <div class="header-right"><button class="btn-logout" id="logoutBtn">🚪 <span>Keluar</span></button></div>
+  </div>
+</div>
 
-    <div class="header">
-        <div class="header-content">
-            <div class="logo">MGL<span>Admin Panel</span></div>
+<div class="greeting-card">
+  <div class="greeting-avatar">👑</div>
+  <div class="greeting-text">
+    <div class="greeting-hello">Halo, Administrator</div>
+    <div class="greeting-name" id="adminName">Admin</div>
+    <div class="greeting-role">Panel Kontrol</div>
+  </div>
+</div>
 
-            <div class="header-right">
-                <button class="btn-logout" id="logoutBtn">
-                    <span>🚪</span>
-                    <span>Keluar</span>
-                </button>
-            </div>
-        </div>
-    </div>
+<div class="stats-grid">
+  <div class="stat-card"><div class="stat-value" id="totalUser">0</div><div class="stat-label">Total User</div></div>
+  <div class="stat-card"><div class="stat-value" id="hadirHariIni">0</div><div class="stat-label">Hadir Hari Ini</div></div>
+  <div class="stat-card"><div class="stat-value" id="belumHadir">0</div><div class="stat-label">Belum Hadir</div></div>
+  <div class="stat-card"><div class="stat-value" id="totalKelurahan">0</div><div class="stat-label">Kelurahan</div></div>
+</div>
 
-    <div class="greeting-card">
-        <div class="greeting-avatar">👑</div>
-        <div class="greeting-text">
-            <div class="greeting-hello">Halo, Administrator</div>
-            <div class="greeting-name" id="adminName">Admin</div>
-            <div class="greeting-role">Panel Kontrol</div>
-        </div>
-    </div>
+<div class="card">
+  <div class="card-title"><span class="card-icon">👥</span><h3>Manajemen Akun</h3></div>
+  <p class="small-note">Pembuatan/perubahan Authentication dilakukan melalui Cloud Function. Password tidak disimpan di Firestore.</p>
+  <div class="admin-form">
+    <input id="userUid" placeholder="UID (kosongkan saat tambah)">
+    <input id="userNama" placeholder="Nama lengkap">
+    <input id="userEmail" type="email" placeholder="Email">
+    <input id="userPassword" type="password" placeholder="Password baru (min. 6)">
+    <select id="userRole">
+      <option value="user">User/Fasilitator</option>
+      <option value="koordinator">Koordinator</option>
+      <option value="pemantau">Pemantau</option>
+      <option value="admin">Admin</option>
+    </select>
+    <input id="userKecamatan" placeholder="Kecamatan">
+    <input id="userKelurahan" placeholder="Kelurahan">
+    <input id="userKota" placeholder="Kota">
+  </div>
+  <div class="switch-row">
+    <label><input type="checkbox" id="userActive" checked> Aktif</label>
+    <label><input type="checkbox" id="userDeviceCheck" checked> Device check</label>
+  </div>
+  <div class="admin-actions">
+    <button class="btn-primary" onclick="saveUser()">💾 Simpan / Tambah</button>
+    <button class="btn-orange" onclick="clearUserForm()">✖ Bersihkan</button>
+    <button class="btn-green" onclick="sendResetEmailFromForm()">✉️ Kirim Reset Password</button>
+  </div>
+</div>
 
-    <div class="stats-grid">
-        <div class="stat-card">
-            <div class="stat-value" id="totalUser">0</div>
-            <div class="stat-label">Total User</div>
-        </div>
+<div class="card">
+  <div class="card-title"><span class="card-icon">📋</span><h3>Daftar Akun</h3></div>
+  <div class="table-responsive">
+    <table class="admin-table">
+      <thead><tr><th>Nama</th><th>Email</th><th>Role</th><th>Kecamatan</th><th>Kelurahan</th><th>Status</th><th>Device</th><th>Aksi</th></tr></thead>
+      <tbody id="usersBody"><tr><td colspan="8">Memuat...</td></tr></tbody>
+    </table>
+  </div>
+</div>
 
-        <div class="stat-card">
-            <div class="stat-value" id="hadirHariIni">0</div>
-            <div class="stat-label">Hadir Hari Ini</div>
-        </div>
+<div class="card">
+  <div class="card-title"><span class="card-icon">📍</span><h3>Manajemen Lokasi</h3></div>
+  <div class="admin-form">
+    <input id="locationId" placeholder="ID lokasi (kosongkan saat tambah)">
+    <input id="locationName" placeholder="Nama lokasi">
+    <select id="locationType">
+      <option value="kelurahan">Kelurahan</option>
+      <option value="kantor">Kantor</option>
+    </select>
+    <input id="locationLat" type="number" step="any" placeholder="Latitude">
+    <input id="locationLng" type="number" step="any" placeholder="Longitude">
+    <input id="locationRadius" type="number" min="1" value="100" placeholder="Radius meter">
+  </div>
+  <div class="admin-actions" style="margin-top:10px">
+    <button class="btn-primary" onclick="saveLocation()">💾 Simpan Lokasi</button>
+    <button class="btn-orange" onclick="clearLocationForm()">✖ Bersihkan</button>
+    <button class="btn-green" onclick="useCurrentAdminLocationForLocation()">📍 GPS Saya</button>
+  </div>
+  <div class="table-responsive" style="margin-top:15px">
+    <table class="admin-table">
+      <thead><tr><th>Nama</th><th>Tipe</th><th>Lat</th><th>Lng</th><th>Radius</th><th>Aksi</th></tr></thead>
+      <tbody id="locationsBody"><tr><td colspan="6">Memuat...</td></tr></tbody>
+    </table>
+  </div>
+</div>
 
-        <div class="stat-card">
-            <div class="stat-value" id="belumHadir">0</div>
-            <div class="stat-label">Belum Hadir</div>
-        </div>
+<div class="card">
+  <div class="card-title"><span class="card-icon">📁</span><h3>Manajemen Data</h3></div>
+  <div class="button-group">
+    <button class="btn-outline" onclick="document.getElementById('importExcel').click()">📥 Import Excel</button>
+    <input type="file" id="importExcel" accept=".xlsx,.xls" style="display:none" onchange="handleFileSelect(event)">
+    <button class="btn-outline" onclick="exportData()">📤 Export Excel</button>
+    <button class="btn-outline" onclick="downloadTemplate()">📋 Template</button>
+  </div>
+  <div id="importProgress" style="display:none;margin-top:15px">
+    <div style="height:4px;background:#f0f0f0;border-radius:2px;overflow:hidden"><div id="importProgressBar" style="height:100%;background:#EE2737;width:0%;transition:width .3s"></div></div>
+    <p id="importStatus" style="font-size:12px;margin-top:5px;color:#7F8C8D">Memproses...</p>
+  </div>
+</div>
 
-        <div class="stat-card">
-            <div class="stat-value" id="totalKelurahan">0</div>
-            <div class="stat-label">Kelurahan</div>
-        </div>
-    </div>
+<div class="card">
+  <div class="card-title"><span class="card-icon">🔒</span><h3>Manajemen Device</h3></div>
+  <p><strong>Status Fitur 1 Device 1 Akun:</strong> <span style="color:#27AE60;font-weight:bold">🔒 AKTIF</span></p>
+  <p class="small-note">Admin dan Koordinator bebas device. User/Fasilitator mengikuti device check.</p>
+  <button class="btn-danger" onclick="resetAllDevices()" style="margin-top:10px;padding:10px;width:100%">🔄 Reset Semua Device</button>
+</div>
 
-    <div class="card">
-        <div class="card-title">
-            <span class="card-icon">📁</span>
-            <h3>Manajemen Data</h3>
-        </div>
+<div class="status-card" style="padding:15px;margin-bottom:20px;background:#fff;border-radius:10px;box-shadow:0 2px 4px rgba(0,0,0,.1)">
+  <h3 style="margin-top:0">📍 Status Lokasi Presensi</h3>
+  <div id="locationModeStatus">Memuat...</div>
+</div>
 
-        <div class="button-group">
-            <button class="btn-outline"
-                onclick="document.getElementById('importExcel').click()">
-                <span>📥</span> Import Excel
-            </button>
+<div class="card">
+  <div class="card-title"><span class="card-icon">📍</span><h3>Lokasi Login Sementara</h3></div>
+  <input id="tempLocationName" class="filter-date" placeholder="Nama lokasi kegiatan" style="margin-bottom:10px;width:100%;box-sizing:border-box">
+  <div id="tempMap" style="height:300px;border-radius:10px;margin-bottom:10px;border:1px solid #ddd"></div>
+  <button class="btn-outline" onclick="useCurrentAdminLocation()" style="margin-bottom:10px">📍 Gunakan Lokasi Saya</button>
+  <input id="tempRadius" type="number" class="filter-date" value="100" placeholder="Radius (meter)" style="margin-bottom:10px;width:100%;box-sizing:border-box">
+  <label>Mulai Berlaku</label>
+  <input id="tempStart" type="datetime-local" class="filter-date" style="margin-bottom:10px;width:100%;box-sizing:border-box">
+  <label>Selesai Berlaku</label>
+  <input id="tempEnd" type="datetime-local" class="filter-date" style="margin-bottom:10px;width:100%;box-sizing:border-box">
+  <div class="button-group">
+    <button class="btn-filter" onclick="saveTemporaryLocation()">✅ Aktifkan Lokasi</button>
+    <button class="btn-reset" onclick="disableTemporaryLocation()">↩ Kembalikan Normal</button>
+  </div>
+  <input id="tempLat" hidden><input id="tempLng" hidden>
+</div>
 
-            <input
-                type="file"
-                id="importExcel"
-                accept=".xlsx,.xls"
-                style="display:none"
-                onchange="handleFileSelect(event)"
-            >
+<div class="card">
+  <div class="card-title"><span class="card-icon">🔍</span><h3>Filter Presensi</h3></div>
+  <div class="filter-group">
+    <select id="filterKelurahan" class="filter-select"><option value="">Semua Kelurahan</option></select>
+    <input type="date" id="filterTanggal" class="filter-date">
+    <button class="btn-filter" onclick="applyFilter()">🔍 Terapkan</button>
+    <button class="btn-reset" onclick="resetFilter()">⟲ Reset</button>
+  </div>
+</div>
 
-            <button class="btn-outline" onclick="exportData()">
-                <span>📤</span> Export Excel
-            </button>
+<div class="card">
+  <div class="card-title"><span class="card-icon">🗺️</span><h3>Monitoring Real-time</h3></div>
+  <div class="map-wrapper"><div id="map" class="map-container-small" style="height:300px;border-radius:10px"></div></div>
+</div>
 
-            <button class="btn-outline" onclick="downloadTemplate()">
-                <span>📋</span> Template
-            </button>
-        </div>
+<div class="card" id="tabelCard">
+  <div class="card-title"><span class="card-icon">📋</span><h3>Rekap Presensi</h3></div>
+  <div class="table-responsive">
+    <table class="data-table">
+      <thead><tr><th>No</th><th>Nama</th><th>Kelurahan</th><th>Status</th><th>Waktu</th><th>Lokasi</th><th>Device</th><th>Aksi</th></tr></thead>
+      <tbody id="tableBody"><tr><td colspan="8" class="text-center">Memuat data...</td></tr></tbody>
+    </table>
+  </div>
+</div>
 
-        <div id="importProgress" style="display:none; margin-top:15px;">
-            <div style="height:4px;background:#f0f0f0;border-radius:2px;overflow:hidden;">
-                <div
-                    id="importProgressBar"
-                    style="height:100%;background:#EE2737;width:0%;transition:width .3s;">
-                </div>
-            </div>
+<div class="loading-overlay" id="loading"><div class="loading-spinner"></div></div>
 
-            <p id="importStatus"
-               style="font-size:12px;margin-top:5px;color:#7F8C8D;">
-               Memproses...
-            </p>
-        </div>
-    </div>
-
-    <div class="card">
-        <div class="card-title">
-            <span class="card-icon">🔒</span>
-            <h3>Manajemen Device</h3>
-        </div>
-
-        <div style="padding:10px 0;">
-            <p>
-                <strong>Status Fitur 1 Device 1 Akun:</strong>
-                <span style="color:#27AE60;font-weight:bold;">
-                    🔒 AKTIF PERMANEN
-                </span>
-            </p>
-
-            <p style="font-size:12px;color:#7F8C8D;margin-top:5px;">
-                👑 Admin: Bebas device<br>
-                📋 Koordinator: Bebas device<br>
-                👤 User Biasa: 1 device
-            </p>
-
-            <button class="btn-danger"
-                onclick="resetAllDevices()"
-                style="margin-top:10px;padding:10px;width:100%;">
-                🔄 Reset Semua Device
-            </button>
-        </div>
-    </div>
-
-    <div class="status-card" style="padding: 15px; margin-bottom: 20px; background: #fff; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-        <h3 style="margin-top: 0;">📍 Status Lokasi Presensi</h3>
-        <div id="locationModeStatus">Memuat...</div>
-    </div>  
-
-    <div class="card">
-        <div class="card-title">
-            <span class="card-icon">📍</span>
-            <h3>Lokasi Login Sementara</h3>
-        </div>
-
-        <input
-            id="tempLocationName"
-            class="filter-date"
-            placeholder="Nama lokasi kegiatan"
-            style="margin-bottom:10px; width: 100%; box-sizing: border-box;"
-        >
-
-        <div
-            id="tempMap"
-            style="
-                height:300px;
-                border-radius:10px;
-                margin-bottom:10px;
-                border:1px solid #ddd;
-            ">
-        </div>
-
-        <button class="btn-outline"
-            onclick="useCurrentAdminLocation()"
-            style="margin-bottom:10px;">
-            📍 Gunakan Lokasi Saya
-        </button>
-
-        <input
-            id="tempRadius"
-            type="number"
-            class="filter-date"
-            value="100"
-            placeholder="Radius (meter)"
-            style="margin-bottom:10px; width: 100%; box-sizing: border-box;"
-        >
-
-        <label style="display: block; margin-bottom: 5px;">Mulai Berlaku</label>
-        <input
-            id="tempStart"
-            type="datetime-local"
-            class="filter-date"
-            style="margin-bottom:10px; width: 100%; box-sizing: border-box;"
-        >
-
-        <label style="display: block; margin-bottom: 5px;">Selesai Berlaku</label>
-        <input
-            id="tempEnd"
-            type="datetime-local"
-            class="filter-date"
-            style="margin-bottom:10px; width: 100%; box-sizing: border-box;"
-        >
-
-        <div class="button-group">
-            <button
-                class="btn-filter"
-                onclick="saveTemporaryLocation()">
-                ✅ Aktifkan Lokasi
-            </button>
-
-            <button
-                class="btn-reset"
-                onclick="disableTemporaryLocation()">
-                ↩ Kembalikan Normal
-            </button>
-        </div>
-
-        <input id="tempLat" hidden>
-        <input id="tempLng" hidden>
-    </div>
-
-    <div class="card">
-        <div class="card-title">
-            <span class="card-icon">🔍</span>
-            <h3>Filter Presensi</h3>
-        </div>
-
-        <div class="filter-group">
-            <select id="filterKelurahan" class="filter-select">
-                <option value="">Semua Kelurahan</option>
-            </select>
-
-            <input
-                type="date"
-                id="filterTanggal"
-                class="filter-date"
-            >
-
-            <button class="btn-filter" onclick="applyFilter()">
-                <span>🔍</span> Terapkan
-            </button>
-
-            <button class="btn-reset" onclick="resetFilter()">
-                <span>⟲</span> Reset
-            </button>
-        </div>
-    </div>
-
-    <div class="card">
-        <div class="card-title">
-            <span class="card-icon">🗺️</span>
-            <h3>Monitoring Real-time</h3>
-        </div>
-
-        <div class="map-wrapper">
-            <div
-                id="map"
-                class="map-container-small"
-                style="height:300px; border-radius: 10px;">
-            </div>
-        </div>
-    </div>
-
-    <div class="card" id="tabelCard">
-        <div class="card-title">
-            <span class="card-icon">📋</span>
-            <h3>Rekap Presensi</h3>
-        </div>
-
-        <div class="table-responsive">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>No</th>
-                        <th>Nama</th>
-                        <th>Kelurahan</th>
-                        <th>Status</th>
-                        <th>Waktu</th>
-                        <th>Lokasi</th>
-                        <th>Device</th>
-                        <th>Aksi</th>
-                    </tr>
-                </thead>
-
-                <tbody id="tableBody">
-                    <tr>
-                        <td colspan="8" class="text-center">
-                            Memuat data...
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-    </div>
-
-    <div class="loading-overlay" id="loading">
-        <div class="loading-spinner"></div>
-    </div>
-
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
-
-    <script type="module" src="js/admin.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+<script type="module" src="js/admin.js"></script>
 </body>
 </html>
