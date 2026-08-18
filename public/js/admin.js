@@ -1,779 +1,3789 @@
 import { auth, db } from "./firebase-init.js";
+
 import {
-  collection, getDocs, query, where, doc, updateDoc, getDoc, setDoc,
-  deleteDoc, serverTimestamp, limit, startAfter, onSnapshot
+    collection,
+    getDocs,
+    query,
+    where,
+    doc,
+    updateDoc,
+    getDoc,
+    setDoc,
+    addDoc,
+    deleteDoc,
+    serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
-import { signOut, sendPasswordResetEmail, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
-import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-functions.js";
-import { initMap, addMarker } from "./map.js";
-import { exportToExcel } from "./export.js";
-import { importFromExcel } from "./import.js";
 
-const functions = getFunctions(undefined, "asia-southeast2");
-const adminUserAction = httpsCallable(functions, "adminUserAction");
+import {
+    signOut
+} from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
 
-function getTodayLocal() {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`;
-}
+import {
+    initMap,
+    addMarker
+} from "./map.js";
 
-const PAGE_SIZE = 20;
-let lastVisible = null;
-let currentPage = 1;
-let currentUsers = [];
+import {
+    resetUserDevice
+} from "./device.js";
+
+import {
+    exportToExcel
+} from "./export.js";
+
+import {
+    importFromExcel
+} from "./import.js";
+
+
+// =====================================================
+// KONFIGURASI
+// =====================================================
+
+const CACHE_DURATION = 300000;
+
+const dataCache = {
+    users: null,
+    usersTimestamp: null,
+
+    stats: null,
+    statsTimestamp: null,
+
+    kelurahan: null,
+    kelurahanTimestamp: null,
+
+    lokasi: null,
+    lokasiTimestamp: null
+};
+
 let allUsers = [];
 let allLocations = [];
+
 let map = null;
 let tempMap = null;
 let tempMarker = null;
-let currentFilter = { kelurahan: "", tanggal: getTodayLocal() };
+let locationEditMap = null;
+let locationEditMarker = null;
 
-const dataCache = {
-  stats: null, statsTimestamp: 0,
-  kelurahan: null, kelurahanTimestamp: 0
+let currentFilter = {
+    kelurahan: "",
+    tanggal: getTodayLocal()
 };
 
-function invalidateCaches() {
-  dataCache.stats = null;
-  dataCache.statsTimestamp = 0;
-  dataCache.kelurahan = null;
-  dataCache.kelurahanTimestamp = 0;
+
+// =====================================================
+// UTILITAS
+// =====================================================
+
+function getTodayLocal() {
+
+    const now = new Date();
+
+    const year = now.getFullYear();
+
+    const month = String(
+        now.getMonth() + 1
+    ).padStart(2, "0");
+
+    const day = String(
+        now.getDate()
+    ).padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
 }
 
-function showLoading(show) {
-  const el = document.getElementById("loading");
-  if (el) el.style.display = show ? "flex" : "none";
+
+function getCache(key) {
+
+    const cache = dataCache[key];
+
+    const timestamp =
+        dataCache[`${key}Timestamp`];
+
+    if (
+        cache &&
+        timestamp &&
+        Date.now() - timestamp < CACHE_DURATION
+    ) {
+        return cache;
+    }
+
+    return null;
 }
 
-async function logout() {
-  if (!confirm("Yakin ingin keluar?")) return;
-  await signOut(auth);
-  localStorage.clear();
-  window.location.replace("index.html");
+
+function setCache(key, data) {
+
+    dataCache[key] = data;
+
+    dataCache[`${key}Timestamp`] =
+        Date.now();
 }
+
+
+function clearCache() {
+
+    Object.keys(dataCache).forEach(key => {
+        dataCache[key] = null;
+    });
+
+}
+
 
 function escapeHtml(value) {
-  return String(value ?? "").replace(/[&<>"']/g, c => ({
-    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
-  }[c]));
-}
 
-async function callAdmin(data) {
-  const result = await adminUserAction(data);
-  return result.data;
-}
-
-function fillUserForm(user) {
-  document.getElementById("userUid").value = user.uid || "";
-  document.getElementById("userNama").value = user.nama || "";
-  document.getElementById("userEmail").value = user.email || "";
-  document.getElementById("userPassword").value = "";
-  document.getElementById("userRole").value = user.role || "user";
-  document.getElementById("userKecamatan").value = user.kecamatan || "";
-  document.getElementById("userKelurahan").value = user.kelurahan || "";
-  document.getElementById("userKota").value = user.kota || "";
-  document.getElementById("userActive").checked = user.active !== false;
-  document.getElementById("userDeviceCheck").checked = user.deviceCheckEnabled !== false;
-  window.scrollTo({ top: 0, behavior: "smooth" });
-}
-
-window.clearUserForm = function() {
-  ["userUid","userNama","userEmail","userPassword","userKecamatan","userKelurahan","userKota"]
-    .forEach(id => document.getElementById(id).value = "");
-  document.getElementById("userRole").value = "user";
-  document.getElementById("userActive").checked = true;
-  document.getElementById("userDeviceCheck").checked = true;
-};
-
-window.saveUser = async function() {
-  const uid = document.getElementById("userUid").value.trim();
-  const nama = document.getElementById("userNama").value.trim();
-  const email = document.getElementById("userEmail").value.trim();
-  const password = document.getElementById("userPassword").value;
-  const role = document.getElementById("userRole").value;
-  const kecamatan = document.getElementById("userKecamatan").value.trim();
-  const kelurahan = document.getElementById("userKelurahan").value.trim();
-  const kota = document.getElementById("userKota").value.trim();
-  const active = document.getElementById("userActive").checked;
-  const deviceCheckEnabled = document.getElementById("userDeviceCheck").checked;
-
-  if (!nama || !email) {
-    alert("Nama dan email wajib diisi.");
-    return;
-  }
-
-  showLoading(true);
-  try {
-    const payload = {
-      action: uid ? "update" : "create",
-      uid: uid || undefined,
-      nama, email, role, kecamatan, kelurahan, kota,
-      active, deviceCheckEnabled
-    };
-    if (password) payload.password = password;
-
-    const result = await callAdmin(payload);
-    alert("✅ " + result.message);
-    clearUserForm();
-    await loadAllUsers();
-    await loadStats(true);
-  } catch (error) {
-    console.error(error);
-    alert("❌ Gagal: " + (error.message || error));
-  } finally {
-    showLoading(false);
-  }
-};
-
-window.editUser = function(uid) {
-  const user = allUsers.find(u => u.uid === uid);
-  if (user) fillUserForm(user);
-};
-
-window.toggleUser = async function(uid, disabled) {
-  if (!confirm(disabled ? "Nonaktifkan akun ini?" : "Aktifkan akun ini?")) return;
-  showLoading(true);
-  try {
-    const result = await callAdmin({ action: "setDisabled", uid, disabled });
-    alert("✅ " + result.message);
-    await loadAllUsers();
-  } catch (error) {
-    alert("❌ " + error.message);
-  } finally {
-    showLoading(false);
-  }
-};
-
-window.deleteUserAccount = async function(uid, nama) {
-  if (!confirm(`Hapus akun "${nama}"?\n\nAuthentication dan dokumen users/{uid} akan dihapus.`)) return;
-  showLoading(true);
-  try {
-    const result = await callAdmin({ action: "delete", uid });
-    alert("✅ " + result.message);
-    await loadAllUsers();
-    await loadStats(true);
-  } catch (error) {
-    alert("❌ " + error.message);
-  } finally {
-    showLoading(false);
-  }
-};
-
-window.resetDevice = async function(uid) {
-  if (!confirm("Reset device user ini?")) return;
-  showLoading(true);
-  try {
-    const result = await callAdmin({ action: "resetDevice", uid });
-    alert("✅ " + result.message);
-    await loadAllUsers();
-    await loadPresensi(currentPage);
-  } catch (error) {
-    alert("❌ " + error.message);
-  } finally {
-    showLoading(false);
-  }
-};
-
-window.resetAllDevices = async function() {
-  if (!confirm("RESET SEMUA DEVICE USER?")) return;
-  showLoading(true);
-  try {
-    const result = await callAdmin({ action: "resetAllDevices" });
-    alert("✅ " + result.message);
-    await loadAllUsers();
-  } catch (error) {
-    alert("❌ " + error.message);
-  } finally {
-    showLoading(false);
-  }
-};
-
-window.sendResetEmailFromForm = async function() {
-  const email = document.getElementById("userEmail").value.trim();
-  if (!email) {
-    alert("Isi email terlebih dahulu.");
-    return;
-  }
-  try {
-    await sendPasswordResetEmail(auth, email);
-    alert(`✅ Link reset password dikirim ke ${email}.`);
-  } catch (error) {
-    alert("❌ Gagal mengirim reset password: " + error.message);
-  }
-};
-
-function renderUsers() {
-  const body = document.getElementById("usersBody");
-  if (!body) return;
-
-  if (!allUsers.length) {
-    body.innerHTML = '<tr><td colspan="8">Belum ada data user.</td></tr>';
-    return;
-  }
-
-  body.innerHTML = allUsers.map(user => {
-    const active = user.active !== false;
-    const role = escapeHtml(user.role || "user");
-    return `
-      <tr>
-        <td>${escapeHtml(user.nama || "-")}</td>
-        <td>${escapeHtml(user.email || "-")}</td>
-        <td>${role}</td>
-        <td>${escapeHtml(user.kecamatan || "-")}</td>
-        <td>${escapeHtml(user.kelurahan || "-")}</td>
-        <td>${active ? "🟢 Aktif" : "🔴 Nonaktif"}</td>
-        <td>${user.deviceId ? "📱 Terikat" : "📱 Kosong"}</td>
-        <td>
-          <div class="admin-actions">
-            <button class="btn-primary" onclick="editUser('${user.uid}')">Edit</button>
-            <button class="btn-orange" onclick="toggleUser('${user.uid}', ${active})">${active ? "Nonaktifkan" : "Aktifkan"}</button>
-            <button class="btn-green" onclick="resetDevice('${user.uid}')">Reset Device</button>
-            <button class="btn-red" onclick="deleteUserAccount('${user.uid}', '${escapeHtml(user.nama || user.email || "user")}')">Hapus</button>
-          </div>
-        </td>
-      </tr>`;
-  }).join("");
-}
-
-async function loadAllUsers() {
-  const snap = await getDocs(collection(db, "users"));
-  allUsers = snap.docs.map(d => ({ uid: d.id, ...d.data() }));
-  allUsers.sort((a,b) => String(a.nama || "").localeCompare(String(b.nama || ""), "id"));
-  renderUsers();
-}
-
-window.saveLocation = async function() {
-  const id = document.getElementById("locationId").value.trim();
-  const nama = document.getElementById("locationName").value.trim();
-  const tipe = document.getElementById("locationType").value;
-  const lat = Number(document.getElementById("locationLat").value);
-  const lng = Number(document.getElementById("locationLng").value);
-  const radius = Number(document.getElementById("locationRadius").value || 100);
-
-  if (!nama || !Number.isFinite(lat) || !Number.isFinite(lng) || radius <= 0) {
-    alert("Nama, latitude, longitude dan radius harus valid.");
-    return;
-  }
-
-  showLoading(true);
-  try {
-    const ref = id ? doc(db, "lokasi", id) : doc(collection(db, "lokasi"));
-    await setDoc(ref, {
-      nama, tipe, lat, lng, radius,
-      updatedAt: serverTimestamp(),
-      ...(id ? {} : { createdAt: serverTimestamp() })
-    }, { merge: true });
-
-    alert("✅ Lokasi berhasil disimpan.");
-    clearLocationForm();
-    await loadLocations();
-    invalidateCaches();
-    await loadFilterOptions();
-    await loadStats(true);
-  } catch (error) {
-    alert("❌ Gagal menyimpan lokasi: " + error.message);
-  } finally {
-    showLoading(false);
-  }
-};
-
-window.editLocation = function(id) {
-  const loc = allLocations.find(x => x.id === id);
-  if (!loc) return;
-  document.getElementById("locationId").value = loc.id;
-  document.getElementById("locationName").value = loc.nama || "";
-  document.getElementById("locationType").value = loc.tipe || "kelurahan";
-  document.getElementById("locationLat").value = loc.lat ?? "";
-  document.getElementById("locationLng").value = loc.lng ?? "";
-  document.getElementById("locationRadius").value = loc.radius || 100;
-  window.scrollTo({ top: document.getElementById("locationId").closest(".card").offsetTop, behavior: "smooth" });
-};
-
-window.deleteLocation = async function(id, nama) {
-  if (!confirm(`Hapus lokasi "${nama}"?`)) return;
-  showLoading(true);
-  try {
-    await deleteDoc(doc(db, "lokasi", id));
-    alert("✅ Lokasi dihapus.");
-    await loadLocations();
-    invalidateCaches();
-    await loadFilterOptions();
-    await loadStats(true);
-  } catch (error) {
-    alert("❌ Gagal menghapus lokasi: " + error.message);
-  } finally {
-    showLoading(false);
-  }
-};
-
-window.clearLocationForm = function() {
-  document.getElementById("locationId").value = "";
-  document.getElementById("locationName").value = "";
-  document.getElementById("locationType").value = "kelurahan";
-  document.getElementById("locationLat").value = "";
-  document.getElementById("locationLng").value = "";
-  document.getElementById("locationRadius").value = "100";
-};
-
-function renderLocations() {
-  const body = document.getElementById("locationsBody");
-  if (!body) return;
-  if (!allLocations.length) {
-    body.innerHTML = '<tr><td colspan="6">Belum ada lokasi.</td></tr>';
-    return;
-  }
-  body.innerHTML = allLocations.map(loc => `
-    <tr>
-      <td>${escapeHtml(loc.nama || "-")}</td>
-      <td>${escapeHtml(loc.tipe || "-")}</td>
-      <td>${loc.lat ?? "-"}</td>
-      <td>${loc.lng ?? "-"}</td>
-      <td>${loc.radius || 100} m</td>
-      <td>
-        <div class="admin-actions">
-          <button class="btn-primary" onclick="editLocation('${loc.id}')">Edit</button>
-          <button class="btn-red" onclick="deleteLocation('${loc.id}','${escapeHtml(loc.nama || "")}')">Hapus</button>
-        </div>
-      </td>
-    </tr>`).join("");
-}
-
-async function loadLocations() {
-  const snap = await getDocs(collection(db, "lokasi"));
-  allLocations = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-  allLocations.sort((a,b) => String(a.nama || "").localeCompare(String(b.nama || ""), "id"));
-  renderLocations();
-}
-
-window.useCurrentAdminLocationForLocation = function() {
-  if (!navigator.geolocation) return alert("Browser tidak mendukung GPS.");
-  navigator.geolocation.getCurrentPosition(pos => {
-    document.getElementById("locationLat").value = pos.coords.latitude;
-    document.getElementById("locationLng").value = pos.coords.longitude;
-  }, () => alert("Gagal mengambil lokasi."));
-};
-
-async function loadStats(force = false) {
-  if (!force && dataCache.stats && Date.now() - dataCache.statsTimestamp < 300000) {
-    renderStats(dataCache.stats);
-    return;
-  }
-
-  const [usersSnap, kelSnap, presensiSnap] = await Promise.all([
-    getDocs(collection(db, "users")),
-    getDocs(query(collection(db, "lokasi"), where("tipe", "==", "kelurahan"))),
-    getDocs(query(collection(db, "presensi"), where("tanggal", "==", currentFilter.tanggal)))
-  ]);
-
-  const stats = {
-    totalUser: usersSnap.size,
-    totalKelurahan: kelSnap.size,
-    hadirHariIni: presensiSnap.size,
-    belumHadir: Math.max(0, usersSnap.size - presensiSnap.size)
-  };
-  dataCache.stats = stats;
-  dataCache.statsTimestamp = Date.now();
-  renderStats(stats);
-}
-
-function renderStats(stats) {
-  document.getElementById("totalUser").textContent = stats.totalUser;
-  document.getElementById("totalKelurahan").textContent = stats.totalKelurahan;
-  document.getElementById("hadirHariIni").textContent = stats.hadirHariIni;
-  document.getElementById("belumHadir").textContent = stats.belumHadir;
-}
-
-async function loadFilterOptions() {
-  let list = dataCache.kelurahan;
-  if (!list || Date.now() - dataCache.kelurahanTimestamp >= 300000) {
-    const snap = await getDocs(query(collection(db, "lokasi"), where("tipe", "==", "kelurahan")));
-    list = snap.docs.map(d => d.data().nama).filter(Boolean).sort((a,b) => a.localeCompare(b, "id"));
-    dataCache.kelurahan = list;
-    dataCache.kelurahanTimestamp = Date.now();
-  }
-
-  const select = document.getElementById("filterKelurahan");
-  select.innerHTML = '<option value="">Semua Kelurahan</option>';
-  list.forEach(nama => {
-    const option = document.createElement("option");
-    option.value = nama;
-    option.textContent = nama;
-    select.appendChild(option);
-  });
-}
-
-async function loadPresensi(page = 1) {
-  currentPage = page;
-  showLoading(true);
-  try {
-    let q = query(collection(db, "users"), limit(PAGE_SIZE));
-    if (currentFilter.kelurahan) {
-      q = query(collection(db, "users"), where("kelurahan", "==", currentFilter.kelurahan), limit(PAGE_SIZE));
+    if (
+        value === null ||
+        value === undefined
+    ) {
+        return "";
     }
-    if (lastVisible && page > 1) q = query(q, startAfter(lastVisible));
 
-    const usersSnap = await getDocs(q);
-    lastVisible = usersSnap.docs[usersSnap.docs.length - 1] || null;
-
-    currentUsers = usersSnap.docs.map(d => ({ id: d.id, uid: d.id, ...d.data() }));
-
-    const presensiSnap = await getDocs(query(
-      collection(db, "presensi"),
-      where("tanggal", "==", currentFilter.tanggal)
-    ));
-    const presensiMap = new Map();
-    presensiSnap.forEach(d => presensiMap.set(d.data().uid, { id: d.id, ...d.data() }));
-
-    renderTabel(currentUsers, presensiMap, page);
-    updatePaginationButtons();
-  } catch (error) {
-    console.error("loadPresensi:", error);
-  } finally {
-    showLoading(false);
-  }
+    return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
 }
 
-function renderTabel(users, presensiMap, page) {
-  const tbody = document.getElementById("tableBody");
-  let html = "";
-  const startNo = (page - 1) * PAGE_SIZE + 1;
 
-  users.forEach((user, index) => {
-    const p = presensiMap.get(user.uid);
-    const status = p ? "Hadir" : "Belum";
-    const waktu = p?.waktu?.seconds ? new Date(p.waktu.seconds * 1000).toLocaleTimeString() : "-";
-    const lokasi = p ? (p.lokasi === "kantor" ? "Kantor" : (p.lokasi || "-")) : "-";
+// =====================================================
+// LOADING
+// =====================================================
 
-    html += `
-      <tr>
-        <td>${startNo + index}</td>
-        <td>${escapeHtml(user.nama || "-")} <small>${escapeHtml(user.role || "user")}</small></td>
-        <td>${escapeHtml(user.kelurahan || "-")}</td>
-        <td><span style="background:${p ? "#E8F5E9" : "#FFEBEE"};color:${p ? "#27AE60" : "#E74C3C"};padding:3px 8px;border-radius:12px">${status}</span></td>
-        <td>${waktu}</td>
-        <td>${escapeHtml(lokasi)}</td>
-        <td>${user.deviceId ? "📱" : "📱-"}</td>
-        <td><button onclick="resetDevice('${user.uid}')" style="background:none;border:none;color:#EE2737;cursor:pointer">⟲ Reset</button></td>
-      </tr>`;
-  });
+function showLoading(show) {
 
-  tbody.innerHTML = users.length ? html : '<tr><td colspan="8" class="text-center">Tidak ada data</td></tr>';
-}
+    const el =
+        document.getElementById("loading");
 
-function createPaginationButtons() {
-  const tableContainer = document.querySelector(".table-responsive");
-  const tabelCard = tableContainer?.parentElement;
-  if (!tabelCard || document.getElementById("paginationNav")) return;
-
-  const nav = document.createElement("div");
-  nav.id = "paginationNav";
-  nav.style.cssText = "display:flex;justify-content:center;gap:10px;margin:15px 0";
-  nav.innerHTML = `
-    <button onclick="prevPage()" id="prevBtn">◀ Sebelumnya</button>
-    <span id="pageInfo">Halaman 1</span>
-    <button onclick="nextPage()" id="nextBtn">Berikutnya ▶</button>`;
-  tabelCard.appendChild(nav);
-}
-
-window.prevPage = () => {
-  if (currentPage > 1) loadPresensi(currentPage - 1);
-};
-window.nextPage = () => loadPresensi(currentPage + 1);
-
-function updatePaginationButtons() {
-  const prev = document.getElementById("prevBtn");
-  const next = document.getElementById("nextBtn");
-  const info = document.getElementById("pageInfo");
-  if (!prev || !next || !info) return;
-  prev.disabled = currentPage === 1;
-  next.disabled = currentUsers.length < PAGE_SIZE;
-  info.textContent = `Halaman ${currentPage}`;
-}
-
-window.applyFilter = () => {
-  currentFilter.kelurahan = document.getElementById("filterKelurahan").value;
-  currentFilter.tanggal = document.getElementById("filterTanggal").value || getTodayLocal();
-  lastVisible = null;
-  loadPresensi(1);
-  loadStats(true);
-};
-
-window.resetFilter = () => {
-  currentFilter = { kelurahan: "", tanggal: getTodayLocal() };
-  document.getElementById("filterKelurahan").value = "";
-  document.getElementById("filterTanggal").value = currentFilter.tanggal;
-  lastVisible = null;
-  loadPresensi(1);
-  loadStats(true);
-};
-
-function initTemporaryMap() {
-  const div = document.getElementById("tempMap");
-  if (!div || typeof L === "undefined") return;
-  if (tempMap) tempMap.remove();
-
-  tempMap = L.map("tempMap").setView([-7.4706, 110.2177], 13);
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    attribution: "&copy; OpenStreetMap"
-  }).addTo(tempMap);
-
-  tempMap.on("click", e => setTemporaryMarker(e.latlng.lat, e.latlng.lng));
-}
-
-function setTemporaryMarker(lat, lng) {
-  document.getElementById("tempLat").value = lat;
-  document.getElementById("tempLng").value = lng;
-  if (tempMarker) tempMap.removeLayer(tempMarker);
-  tempMarker = L.marker([lat, lng]).addTo(tempMap);
-  tempMap.setView([lat, lng], 16);
-}
-
-window.useCurrentAdminLocation = function() {
-  if (!navigator.geolocation) return alert("Browser tidak mendukung GPS.");
-  navigator.geolocation.getCurrentPosition(pos => {
-    setTemporaryMarker(pos.coords.latitude, pos.coords.longitude);
-  }, () => alert("Gagal mengambil lokasi."));
-};
-
-window.saveTemporaryLocation = async function() {
-  const name = document.getElementById("tempLocationName").value.trim();
-  const lat = Number(document.getElementById("tempLat").value);
-  const lng = Number(document.getElementById("tempLng").value);
-  const radius = Number(document.getElementById("tempRadius").value || 100);
-  const start = document.getElementById("tempStart").value;
-  const end = document.getElementById("tempEnd").value;
-
-  if (!name || !Number.isFinite(lat) || !Number.isFinite(lng) || !start || !end || radius <= 0) {
-    alert("Lengkapi nama, lokasi, radius, waktu mulai dan selesai.");
-    return;
-  }
-
-  showLoading(true);
-  try {
-    await setDoc(doc(db, "system_settings", "global"), {
-      temporaryLocationEnabled: true,
-      statusLokasi: "custom",
-      temporaryLocationName: name,
-      temporaryLatitude: lat,
-      temporaryLongitude: lng,
-      temporaryRadius: radius,
-      temporaryStart: start,
-      temporaryEnd: end,
-      updatedAt: serverTimestamp()
-    }, { merge: true });
-    alert("✅ Lokasi sementara berhasil diaktifkan.");
-    await loadLocationModeStatus();
-  } catch (error) {
-    alert("❌ " + error.message);
-  } finally {
-    showLoading(false);
-  }
-};
-
-window.disableTemporaryLocation = async function() {
-  if (!confirm("Kembalikan ke lokasi normal?")) return;
-  showLoading(true);
-  try {
-    await setDoc(doc(db, "system_settings", "global"), {
-      temporaryLocationEnabled: false,
-      statusLokasi: "default",
-      updatedAt: serverTimestamp()
-    }, { merge: true });
-    alert("✅ Lokasi normal dipulihkan.");
-    await loadLocationModeStatus();
-  } catch (error) {
-    alert("❌ " + error.message);
-  } finally {
-    showLoading(false);
-  }
-};
-
-async function loadTemporaryLocation() {
-  const snap = await getDoc(doc(db, "system_settings", "global"));
-  if (!snap.exists()) return;
-  const data = snap.data();
-
-  document.getElementById("tempLocationName").value = data.temporaryLocationName || "";
-  document.getElementById("tempRadius").value = data.temporaryRadius || 100;
-  document.getElementById("tempStart").value = data.temporaryStart || "";
-  document.getElementById("tempEnd").value = data.temporaryEnd || "";
-
-  if (data.temporaryLatitude != null && data.temporaryLongitude != null) {
-    setTemporaryMarker(data.temporaryLatitude, data.temporaryLongitude);
-  }
-}
-
-async function loadLocationModeStatus() {
-  try {
-    const snap = await getDoc(doc(db, "system_settings", "global"));
-    const el = document.getElementById("locationModeStatus");
     if (!el) return;
 
-    if (!snap.exists()) {
-      el.innerHTML = "🟢 Menggunakan lokasi default";
-      return;
+    el.style.display =
+        show ? "flex" : "none";
+}
+
+
+// =====================================================
+// LOGOUT
+// =====================================================
+
+async function logout() {
+
+    if (!confirm("Yakin ingin keluar?")) {
+        return;
     }
 
-    const data = snap.data();
-    const now = new Date();
-    const start = data.temporaryStart ? new Date(data.temporaryStart) : null;
-    const end = data.temporaryEnd ? new Date(data.temporaryEnd) : null;
-    const active = data.temporaryLocationEnabled && start && end && now >= start && now <= end;
+    try {
 
-    el.innerHTML = active
-      ? `🟣 <b>Lokasi sementara aktif</b><br>Nama: ${escapeHtml(data.temporaryLocationName || "-")}<br>Radius: ${data.temporaryRadius || 100} m`
-      : "🟢 Menggunakan lokasi default (kantor/kelurahan)";
-  } catch (error) {
-    console.error(error);
-  }
+        await signOut(auth);
+
+        localStorage.clear();
+
+        window.location.href =
+            "index.html";
+
+    } catch (error) {
+
+        alert(
+            "Gagal keluar: " +
+            error.message
+        );
+
+    }
 }
+
+
+// =====================================================
+// INIT
+// =====================================================
+
+window.addEventListener(
+    "load",
+    async () => {
+
+        showLoading(true);
+
+        try {
+
+            const logoutBtn =
+                document.getElementById(
+                    "logoutBtn"
+                );
+
+            if (logoutBtn) {
+
+                logoutBtn.addEventListener(
+                    "click",
+                    logout
+                );
+
+            }
+
+
+            const filterTanggal =
+                document.getElementById(
+                    "filterTanggal"
+                );
+
+            if (filterTanggal) {
+
+                filterTanggal.value =
+                    currentFilter.tanggal;
+
+            }
+
+
+            await loadAdminInfo();
+
+            await loadUsers();
+
+            await loadStats();
+
+            await loadFilterOptions();
+
+            await loadPresensi();
+
+            initTemporaryMap();
+
+            await loadTemporaryLocation();
+
+            await loadLocationModeStatus();
+
+            await initMapMonitoring();
+
+
+        } catch (error) {
+
+            console.error(
+                "Error init:",
+                error
+            );
+
+            alert(
+                "Gagal memuat data: " +
+                error.message
+            );
+
+        } finally {
+
+            showLoading(false);
+
+        }
+
+    }
+);
+
+
+// =====================================================
+// ADMIN INFO
+// =====================================================
+
+async function loadAdminInfo() {
+
+    try {
+
+        if (!auth.currentUser) {
+            return;
+        }
+
+        const snap =
+            await getDoc(
+                doc(
+                    db,
+                    "users",
+                    auth.currentUser.uid
+                )
+            );
+
+        if (!snap.exists()) {
+            return;
+        }
+
+        const data =
+            snap.data();
+
+        const name =
+            document.getElementById(
+                "adminName"
+            );
+
+        if (name) {
+
+            name.textContent =
+                data.nama ||
+                auth.currentUser.displayName ||
+                "Admin";
+
+        }
+
+    } catch (error) {
+
+        console.log(
+            "Admin info gagal:",
+            error
+        );
+
+    }
+}
+
+
+// =====================================================
+// LOAD USERS
+// =====================================================
+
+async function loadUsers(force = false) {
+
+    try {
+
+        if (!force) {
+
+            const cached =
+                getCache("users");
+
+            if (cached) {
+
+                allUsers =
+                    cached;
+
+                return;
+
+            }
+
+        }
+
+
+        const snapshot =
+            await getDocs(
+                collection(
+                    db,
+                    "users"
+                )
+            );
+
+
+        allUsers = [];
+
+        snapshot.forEach(
+            userDoc => {
+
+                const data =
+                    userDoc.data();
+
+                allUsers.push({
+
+                    id: userDoc.id,
+
+                    uid:
+                        data.uid ||
+                        userDoc.id,
+
+                    ...data
+
+                });
+
+            }
+        );
+
+
+        allUsers.sort(
+            (a, b) =>
+                String(
+                    a.nama || ""
+                ).localeCompare(
+                    String(
+                        b.nama || ""
+                    )
+                )
+        );
+
+
+        setCache(
+            "users",
+            allUsers
+        );
+
+
+        updateUserCount();
+
+
+    } catch (error) {
+
+        console.error(
+            "Error load users:",
+            error
+        );
+
+        throw error;
+
+    }
+}
+
+
+function updateUserCount() {
+
+    const el =
+        document.getElementById(
+            "adminMenuInfo"
+        );
+
+    if (!el) return;
+
+    el.textContent =
+        `${allUsers.length} user tersimpan di Firestore.`;
+
+}
+
+
+// =====================================================
+// STATISTIK
+// =====================================================
+
+async function loadStats(force = false) {
+
+    try {
+
+        if (!force) {
+
+            const cached =
+                getCache("stats");
+
+            if (cached) {
+
+                updateStatsUI(
+                    cached
+                );
+
+                return;
+
+            }
+
+        }
+
+
+        const [
+            usersSnap,
+            kelurahanSnap,
+            presensiSnap
+        ] = await Promise.all([
+
+            getDocs(
+                collection(
+                    db,
+                    "users"
+                )
+            ),
+
+            getDocs(
+                query(
+                    collection(
+                        db,
+                        "lokasi"
+                    ),
+                    where(
+                        "tipe",
+                        "==",
+                        "kelurahan"
+                    )
+                )
+            ),
+
+            getDocs(
+                query(
+                    collection(
+                        db,
+                        "presensi"
+                    ),
+                    where(
+                        "tanggal",
+                        "==",
+                        currentFilter.tanggal
+                    )
+                )
+            )
+
+        ]);
+
+
+        const stats = {
+
+            totalUser:
+                usersSnap.size,
+
+            totalKelurahan:
+                kelurahanSnap.size,
+
+            hadirHariIni:
+                presensiSnap.size,
+
+            belumHadir:
+                Math.max(
+                    0,
+                    usersSnap.size -
+                    presensiSnap.size
+                )
+
+        };
+
+
+        setCache(
+            "stats",
+            stats
+        );
+
+
+        updateStatsUI(
+            stats
+        );
+
+
+    } catch (error) {
+
+        console.error(
+            "Error load stats:",
+            error
+        );
+
+    }
+}
+
+
+function updateStatsUI(stats) {
+
+    const totalUser =
+        document.getElementById(
+            "totalUser"
+        );
+
+    const totalKelurahan =
+        document.getElementById(
+            "totalKelurahan"
+        );
+
+    const hadir =
+        document.getElementById(
+            "hadirHariIni"
+        );
+
+    const belum =
+        document.getElementById(
+            "belumHadir"
+        );
+
+
+    if (totalUser) {
+        totalUser.textContent =
+            stats.totalUser;
+    }
+
+    if (totalKelurahan) {
+        totalKelurahan.textContent =
+            stats.totalKelurahan;
+    }
+
+    if (hadir) {
+        hadir.textContent =
+            stats.hadirHariIni;
+    }
+
+    if (belum) {
+        belum.textContent =
+            stats.belumHadir;
+    }
+
+}
+
+
+// =====================================================
+// FILTER KELURAHAN
+// =====================================================
+
+async function loadFilterOptions() {
+
+    try {
+
+        let list =
+            getCache(
+                "kelurahan"
+            );
+
+
+        if (!list) {
+
+            const snapshot =
+                await getDocs(
+                    query(
+                        collection(
+                            db,
+                            "lokasi"
+                        ),
+                        where(
+                            "tipe",
+                            "==",
+                            "kelurahan"
+                        )
+                    )
+                );
+
+
+            list = [];
+
+            snapshot.forEach(
+                locationDoc => {
+
+                    const data =
+                        locationDoc.data();
+
+                    if (data.nama) {
+
+                        list.push(
+                            data.nama
+                        );
+
+                    }
+
+                }
+            );
+
+
+            list =
+                [...new Set(list)]
+                .sort();
+
+
+            setCache(
+                "kelurahan",
+                list
+            );
+
+        }
+
+
+        const select =
+            document.getElementById(
+                "filterKelurahan"
+            );
+
+        if (!select) return;
+
+
+        select.innerHTML =
+            `<option value="">
+                Semua Kelurahan
+            </option>`;
+
+
+        list.forEach(
+            nama => {
+
+                const option =
+                    document.createElement(
+                        "option"
+                    );
+
+                option.value =
+                    nama;
+
+                option.textContent =
+                    nama;
+
+                select.appendChild(
+                    option
+                );
+
+            }
+        );
+
+
+    } catch (error) {
+
+        console.error(
+            "Error filter:",
+            error
+        );
+
+    }
+}
+
+
+// =====================================================
+// LOAD PRESENSI
+// =====================================================
+
+async function loadPresensi() {
+
+    try {
+
+        showLoading(true);
+
+
+        let users =
+            allUsers;
+
+
+        if (
+            currentFilter.kelurahan
+        ) {
+
+            users =
+                users.filter(
+                    user =>
+                        user.kelurahan ===
+                        currentFilter.kelurahan
+                );
+
+        }
+
+
+        const presensiSnap =
+            await getDocs(
+                query(
+                    collection(
+                        db,
+                        "presensi"
+                    ),
+                    where(
+                        "tanggal",
+                        "==",
+                        currentFilter.tanggal
+                    )
+                )
+            );
+
+
+        const presensiMap =
+            new Map();
+
+
+        presensiSnap.forEach(
+            presensiDoc => {
+
+                const data =
+                    presensiDoc.data();
+
+                if (data.uid) {
+
+                    presensiMap.set(
+                        data.uid,
+                        {
+                            id:
+                                presensiDoc.id,
+                            ...data
+                        }
+                    );
+
+                }
+
+            }
+        );
+
+
+        renderTabel(
+            users,
+            presensiMap
+        );
+
+
+    } catch (error) {
+
+        console.error(
+            "Error load presensi:",
+            error
+        );
+
+    } finally {
+
+        showLoading(false);
+
+    }
+}
+
+
+// =====================================================
+// RENDER TABEL
+// =====================================================
+
+function renderTabel(
+    users,
+    presensiMap
+) {
+
+    const tbody =
+        document.getElementById(
+            "tableBody"
+        );
+
+    if (!tbody) return;
+
+
+    if (users.length === 0) {
+
+        tbody.innerHTML = `
+            <tr>
+                <td
+                    colspan="8"
+                    class="text-center">
+                    Tidak ada data user
+                </td>
+            </tr>
+        `;
+
+        return;
+
+    }
+
+
+    let html = "";
+
+
+    users.forEach(
+        (user, index) => {
+
+            const p =
+                presensiMap.get(
+                    user.uid
+                );
+
+
+            const status =
+                p
+                    ? "Hadir"
+                    : "Belum";
+
+
+            let waktu = "-";
+
+
+            if (
+                p &&
+                p.waktu
+            ) {
+
+                if (
+                    p.waktu.seconds
+                ) {
+
+                    waktu =
+                        new Date(
+                            p.waktu.seconds *
+                            1000
+                        ).toLocaleTimeString(
+                            "id-ID"
+                        );
+
+                }
+
+            }
+
+
+            const lokasi =
+                p
+                    ? (
+                        p.lokasi ===
+                        "kantor"
+                            ? "Kantor"
+                            : (
+                                p.lokasi ||
+                                "-"
+                            )
+                    )
+                    : "-";
+
+
+            let roleBadge = "";
+
+
+            if (
+                user.role ===
+                "admin"
+            ) {
+
+                roleBadge =
+                    `<span style="
+                        background:#3498DB;
+                        color:white;
+                        padding:2px 6px;
+                        border-radius:10px;
+                        font-size:10px;
+                    ">
+                        👑 Admin
+                    </span>`;
+
+            } else if (
+                user.role ===
+                "koordinator"
+            ) {
+
+                roleBadge =
+                    `<span style="
+                        background:#F39C12;
+                        color:white;
+                        padding:2px 6px;
+                        border-radius:10px;
+                        font-size:10px;
+                    ">
+                        📋 Koord
+                    </span>`;
+
+            } else {
+
+                roleBadge =
+                    `<span style="
+                        background:#95A5A6;
+                        color:white;
+                        padding:2px 6px;
+                        border-radius:10px;
+                        font-size:10px;
+                    ">
+                        👤 User
+                    </span>`;
+
+            }
+
+
+            html += `
+                <tr>
+
+                    <td>
+                        ${index + 1}
+                    </td>
+
+                    <td>
+                        ${escapeHtml(
+                            user.nama || "-"
+                        )}
+                        ${roleBadge}
+                    </td>
+
+                    <td>
+                        ${escapeHtml(
+                            user.kelurahan || "-"
+                        )}
+                    </td>
+
+                    <td>
+
+                        <span style="
+                            background:
+                                ${p
+                                    ? "#E8F5E9"
+                                    : "#FFEBEE"};
+                            color:
+                                ${p
+                                    ? "#27AE60"
+                                    : "#E74C3C"};
+                            padding:3px 8px;
+                            border-radius:12px;
+                        ">
+
+                            ${status}
+
+                        </span>
+
+                    </td>
+
+                    <td>
+                        ${waktu}
+                    </td>
+
+                    <td>
+                        ${escapeHtml(
+                            lokasi
+                        )}
+                    </td>
+
+                    <td>
+                        ${user.deviceId
+                            ? "📱"
+                            : "📱-"}
+                    </td>
+
+                    <td>
+
+                        <button
+                            class="btn-edit"
+                            onclick="editUser('${user.id}')">
+                            ✏️
+                        </button>
+
+                        <button
+                            onclick="resetDevice('${user.uid}')"
+                            style="
+                                background:none;
+                                border:none;
+                                color:#EE2737;
+                                cursor:pointer;
+                            ">
+                            ⟲
+                        </button>
+
+                    </td>
+
+                </tr>
+            `;
+
+        }
+    );
+
+
+    tbody.innerHTML =
+        html;
+
+}
+
+
+// =====================================================
+// TAMBAH / EDIT USER
+// =====================================================
+
+window.openAddUserModal =
+    function() {
+
+        document.getElementById(
+            "userModalTitle"
+        ).textContent =
+            "👤 Tambah User";
+
+
+        document.getElementById(
+            "userDocId"
+        ).value = "";
+
+
+        document.getElementById(
+            "userUid"
+        ).value = "";
+
+
+        document.getElementById(
+            "userNama"
+        ).value = "";
+
+
+        document.getElementById(
+            "userEmail"
+        ).value = "";
+
+
+        document.getElementById(
+            "userPassword"
+        ).value = "";
+
+
+        document.getElementById(
+            "userRole"
+        ).value = "user";
+
+
+        document.getElementById(
+            "userKecamatan"
+        ).value = "";
+
+
+        document.getElementById(
+            "userKelurahan"
+        ).value = "";
+
+
+        document.getElementById(
+            "userKota"
+        ).value = "";
+
+
+        document.getElementById(
+            "userActive"
+        ).value = "true";
+
+
+        document.getElementById(
+            "userDeviceCheck"
+        ).value = "true";
+
+
+        document.getElementById(
+            "userModal"
+        ).classList.add(
+            "show"
+        );
+
+    };
+
+
+window.editUser =
+    function(id) {
+
+        const user =
+            allUsers.find(
+                item =>
+                    item.id === id
+            );
+
+
+        if (!user) {
+
+            alert(
+                "Data user tidak ditemukan."
+            );
+
+            return;
+
+        }
+
+
+        document.getElementById(
+            "userModalTitle"
+        ).textContent =
+            "✏️ Edit User";
+
+
+        document.getElementById(
+            "userDocId"
+        ).value =
+            user.id;
+
+
+        document.getElementById(
+            "userUid"
+        ).value =
+            user.uid ||
+            user.id;
+
+
+        document.getElementById(
+            "userNama"
+        ).value =
+            user.nama || "";
+
+
+        document.getElementById(
+            "userEmail"
+        ).value =
+            user.email || "";
+
+
+        document.getElementById(
+            "userPassword"
+        ).value =
+            user.password || "";
+
+
+        document.getElementById(
+            "userRole"
+        ).value =
+            user.role || "user";
+
+
+        document.getElementById(
+            "userKecamatan"
+        ).value =
+            user.kecamatan || "";
+
+
+        document.getElementById(
+            "userKelurahan"
+        ).value =
+            user.kelurahan || "";
+
+
+        document.getElementById(
+            "userKota"
+        ).value =
+            user.kota || "";
+
+
+        document.getElementById(
+            "userActive"
+        ).value =
+            user.active === false
+                ? "false"
+                : "true";
+
+
+        document.getElementById(
+            "userDeviceCheck"
+        ).value =
+            user.deviceCheckEnabled === false
+                ? "false"
+                : "true";
+
+
+        document.getElementById(
+            "userModal"
+        ).classList.add(
+            "show"
+        );
+
+    };
+
+
+window.closeUserModal =
+    function() {
+
+        document.getElementById(
+            "userModal"
+        ).classList.remove(
+            "show"
+        );
+
+    };
+
+
+// =====================================================
+// SIMPAN USER
+// =====================================================
+
+window.saveUser =
+    async function() {
+
+        const docId =
+            document.getElementById(
+                "userDocId"
+            ).value.trim();
+
+
+        const uid =
+            document.getElementById(
+                "userUid"
+            ).value.trim();
+
+
+        const nama =
+            document.getElementById(
+                "userNama"
+            ).value.trim();
+
+
+        const email =
+            document.getElementById(
+                "userEmail"
+            ).value.trim();
+
+
+        const password =
+            document.getElementById(
+                "userPassword"
+            ).value;
+
+
+        const role =
+            document.getElementById(
+                "userRole"
+            ).value;
+
+
+        const kecamatan =
+            document.getElementById(
+                "userKecamatan"
+            ).value.trim();
+
+
+        const kelurahan =
+            document.getElementById(
+                "userKelurahan"
+            ).value.trim();
+
+
+        const kota =
+            document.getElementById(
+                "userKota"
+            ).value.trim();
+
+
+        const active =
+            document.getElementById(
+                "userActive"
+            ).value === "true";
+
+
+        const deviceCheckEnabled =
+            document.getElementById(
+                "userDeviceCheck"
+            ).value === "true";
+
+
+        if (!nama) {
+
+            alert(
+                "Nama wajib diisi."
+            );
+
+            return;
+
+        }
+
+
+        if (!email) {
+
+            alert(
+                "Email wajib diisi."
+            );
+
+            return;
+
+        }
+
+
+        try {
+
+            showLoading(true);
+
+
+            const userData = {
+
+                uid:
+                    uid || docId,
+
+                nama,
+
+                email,
+
+                role,
+
+                kecamatan,
+
+                kelurahan,
+
+                kota,
+
+                active,
+
+                deviceCheckEnabled,
+
+                updatedAt:
+                    serverTimestamp()
+
+            };
+
+
+            /*
+             * Password hanya disimpan jika memang
+             * aplikasi lama kamu membutuhkannya.
+             *
+             * Firebase Authentication tidak diubah
+             * oleh script ini.
+             */
+
+            if (password) {
+
+                userData.password =
+                    password;
+
+            }
+
+
+            if (docId) {
+
+                await updateDoc(
+                    doc(
+                        db,
+                        "users",
+                        docId
+                    ),
+                    userData
+                );
+
+
+                alert(
+                    "✅ User berhasil diperbarui."
+                );
+
+            } else {
+
+                userData.createdAt =
+                    serverTimestamp();
+
+
+                const newDoc =
+                    await addDoc(
+                        collection(
+                            db,
+                            "users"
+                        ),
+                        userData
+                    );
+
+
+                /*
+                 * Kalau UID kosong, gunakan ID dokumen
+                 * sebagai uid Firestore.
+                 */
+
+                if (!uid) {
+
+                    await updateDoc(
+                        newDoc,
+                        {
+                            uid:
+                                newDoc.id
+                        }
+                    );
+
+                }
+
+
+                alert(
+                    "✅ Data user berhasil ditambahkan ke Firestore."
+                );
+
+            }
+
+
+            clearCache();
+
+            await loadUsers(true);
+
+            await loadStats(true);
+
+            await loadFilterOptions();
+
+            await loadPresensi();
+
+
+            closeUserModal();
+
+
+        } catch (error) {
+
+            console.error(
+                "Gagal save user:",
+                error
+            );
+
+            alert(
+                "❌ Gagal: " +
+                error.message
+            );
+
+        } finally {
+
+            showLoading(false);
+
+        }
+
+    };
+
+
+// =====================================================
+// USER MANAGER
+// =====================================================
+
+window.openUserManager =
+    async function() {
+
+        document.getElementById(
+            "userManagerModal"
+        ).classList.add(
+            "show"
+        );
+
+
+        await loadUserManager();
+
+    };
+
+
+window.closeUserManager =
+    function() {
+
+        document.getElementById(
+            "userManagerModal"
+        ).classList.remove(
+            "show"
+        );
+
+    };
+
+
+async function loadUserManager() {
+
+    const list =
+        document.getElementById(
+            "userManagerList"
+        );
+
+
+    if (!list) return;
+
+
+    if (allUsers.length === 0) {
+
+        list.innerHTML =
+            "Tidak ada user.";
+
+        return;
+
+    }
+
+
+    renderUserManager(
+        allUsers
+    );
+
+}
+
+
+function renderUserManager(
+    users
+) {
+
+    const list =
+        document.getElementById(
+            "userManagerList"
+        );
+
+
+    if (!list) return;
+
+
+    if (users.length === 0) {
+
+        list.innerHTML =
+            "Tidak ada user.";
+
+        return;
+
+    }
+
+
+    let html = "";
+
+
+    users.forEach(
+        user => {
+
+            html += `
+                <div style="
+                    border:1px solid #eee;
+                    border-radius:10px;
+                    padding:12px;
+                    margin-bottom:10px;
+                ">
+
+                    <div style="
+                        font-weight:bold;
+                    ">
+                        ${escapeHtml(
+                            user.nama || "-"
+                        )}
+                    </div>
+
+                    <div style="
+                        font-size:12px;
+                        color:#777;
+                        margin-top:4px;
+                    ">
+
+                        ${escapeHtml(
+                            user.email || "-"
+                        )}
+
+                        <br>
+
+                        Role:
+                        ${escapeHtml(
+                            user.role || "user"
+                        )}
+
+                        <br>
+
+                        Kelurahan:
+                        ${escapeHtml(
+                            user.kelurahan || "-"
+                        )}
+
+                        <br>
+
+                        Status:
+                        ${
+                            user.active === false
+                                ? "🔴 Nonaktif"
+                                : "🟢 Aktif"
+                        }
+
+                    </div>
+
+                    <div style="
+                        margin-top:8px;
+                    ">
+
+                        <button
+                            class="btn-edit"
+                            onclick="editUserFromManager('${user.id}')">
+                            ✏️ Edit
+                        </button>
+
+                        <button
+                            class="btn-location"
+                            onclick="resetDevice('${user.uid}')">
+                            📱 Reset Device
+                        </button>
+
+                    </div>
+
+                </div>
+            `;
+
+        }
+    );
+
+
+    list.innerHTML =
+        html;
+
+}
+
+
+window.editUserFromManager =
+    function(id) {
+
+        closeUserManager();
+
+        setTimeout(
+            () => {
+
+                editUser(id);
+
+            },
+            100
+        );
+
+    };
+
+
+window.filterUserManager =
+    function() {
+
+        const input =
+            document.getElementById(
+                "userSearch"
+            );
+
+
+        const keyword =
+            input
+                ? input.value
+                    .trim()
+                    .toLowerCase()
+                : "";
+
+
+        const filtered =
+            allUsers.filter(
+                user => {
+
+                    const text =
+                        [
+                            user.nama,
+                            user.email,
+                            user.kelurahan,
+                            user.kecamatan,
+                            user.role,
+                            user.uid
+                        ]
+                        .join(" ")
+                        .toLowerCase();
+
+
+                    return text.includes(
+                        keyword
+                    );
+
+                }
+            );
+
+
+        renderUserManager(
+            filtered
+        );
+
+    };
+
+
+// =====================================================
+// LOCATION MANAGER
+// =====================================================
+
+window.openLocationManager =
+    async function() {
+
+        document.getElementById(
+            "locationModal"
+        ).classList.add(
+            "show"
+        );
+
+
+        resetLocationForm();
+
+        await loadLocations();
+
+        initLocationEditMap();
+
+    };
+
+
+window.closeLocationManager =
+    function() {
+
+        document.getElementById(
+            "locationModal"
+        ).classList.remove(
+            "show"
+        );
+
+    };
+
+
+function resetLocationForm() {
+
+    document.getElementById(
+        "locationDocId"
+    ).value = "";
+
+
+    document.getElementById(
+        "locationName"
+    ).value = "";
+
+
+    document.getElementById(
+        "locationType"
+    ).value = "kelurahan";
+
+
+    document.getElementById(
+        "locationLat"
+    ).value = "";
+
+
+    document.getElementById(
+        "locationLng"
+    ).value = "";
+
+
+    document.getElementById(
+        "locationRadius"
+    ).value = "100";
+
+}
+
+
+async function loadLocations() {
+
+    try {
+
+        const snapshot =
+            await getDocs(
+                collection(
+                    db,
+                    "lokasi"
+                )
+            );
+
+
+        allLocations = [];
+
+
+        snapshot.forEach(
+            locationDoc => {
+
+                allLocations.push({
+
+                    id:
+                        locationDoc.id,
+
+                    ...locationDoc.data()
+
+                });
+
+            }
+        );
+
+
+        allLocations.sort(
+            (a, b) =>
+                String(
+                    a.nama || ""
+                ).localeCompare(
+                    String(
+                        b.nama || ""
+                    )
+                )
+        );
+
+
+        renderLocationList();
+
+
+    } catch (error) {
+
+        console.error(
+            "Load lokasi error:",
+            error
+        );
+
+
+        const list =
+            document.getElementById(
+                "locationList"
+            );
+
+
+        if (list) {
+
+            list.innerHTML =
+                "❌ Gagal memuat lokasi.";
+
+        }
+
+    }
+
+}
+
+
+function renderLocationList() {
+
+    const list =
+        document.getElementById(
+            "locationList"
+        );
+
+
+    if (!list) return;
+
+
+    if (allLocations.length === 0) {
+
+        list.innerHTML =
+            "Belum ada lokasi.";
+
+        return;
+
+    }
+
+
+    let html = "";
+
+
+    allLocations.forEach(
+        location => {
+
+            html += `
+                <div class="location-item">
+
+                    <div class="location-item-title">
+                        📍
+                        ${escapeHtml(
+                            location.nama ||
+                            "-"
+                        )}
+                    </div>
+
+                    <div class="location-item-info">
+
+                        Tipe:
+                        ${escapeHtml(
+                            location.tipe ||
+                            "-"
+                        )}
+
+                        <br>
+
+                        Koordinat:
+                        ${location.lat ?? "-"},
+                        ${location.lng ?? "-"}
+
+                        <br>
+
+                        Radius:
+                        ${location.radius || 100}
+                        meter
+
+                    </div>
+
+                    <div style="
+                        margin-top:8px;
+                    ">
+
+                        <button
+                            class="btn-edit"
+                            onclick="editLocation('${location.id}')">
+
+                            ✏️ Edit
+
+                        </button>
+
+                        <button
+                            class="btn-delete-small"
+                            onclick="deleteLocation('${location.id}')">
+
+                            🗑️ Hapus
+
+                        </button>
+
+                    </div>
+
+                </div>
+            `;
+
+        }
+    );
+
+
+    list.innerHTML =
+        html;
+
+}
+
+
+// =====================================================
+// EDIT LOCATION
+// =====================================================
+
+window.editLocation =
+    function(id) {
+
+        const location =
+            allLocations.find(
+                item =>
+                    item.id === id
+            );
+
+
+        if (!location) {
+
+            alert(
+                "Lokasi tidak ditemukan."
+            );
+
+            return;
+
+        }
+
+
+        document.getElementById(
+            "locationDocId"
+        ).value =
+            location.id;
+
+
+        document.getElementById(
+            "locationName"
+        ).value =
+            location.nama || "";
+
+
+        document.getElementById(
+            "locationType"
+        ).value =
+            location.tipe ||
+            "kelurahan";
+
+
+        document.getElementById(
+            "locationLat"
+        ).value =
+            location.lat ?? "";
+
+
+        document.getElementById(
+            "locationLng"
+        ).value =
+            location.lng ?? "";
+
+
+        document.getElementById(
+            "locationRadius"
+        ).value =
+            location.radius ||
+            100;
+
+
+        setLocationEditMarker(
+            location.lat,
+            location.lng
+        );
+
+    };
+
+
+// =====================================================
+// MAP EDIT LOCATION
+// =====================================================
+
+function initLocationEditMap() {
+
+    const el =
+        document.getElementById(
+            "locationEditMap"
+        );
+
+
+    if (!el) return;
+
+
+    if (
+        typeof L ===
+        "undefined"
+    ) {
+        return;
+    }
+
+
+    if (locationEditMap) {
+
+        locationEditMap.remove();
+
+    }
+
+
+    locationEditMap =
+        L.map(
+            "locationEditMap"
+        ).setView(
+            [-7.4706, 110.2177],
+            13
+        );
+
+
+    L.tileLayer(
+        "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+        {
+            attribution:
+                "&copy; OpenStreetMap"
+        }
+    ).addTo(
+        locationEditMap
+    );
+
+
+    locationEditMap.on(
+        "click",
+        event => {
+
+            setLocationEditMarker(
+                event.latlng.lat,
+                event.latlng.lng
+            );
+
+        }
+    );
+
+}
+
+
+function setLocationEditMarker(
+    lat,
+    lng
+) {
+
+    lat =
+        parseFloat(lat);
+
+    lng =
+        parseFloat(lng);
+
+
+    if (
+        isNaN(lat) ||
+        isNaN(lng) ||
+        !locationEditMap
+    ) {
+        return;
+    }
+
+
+    if (locationEditMarker) {
+
+        locationEditMap.removeLayer(
+            locationEditMarker
+        );
+
+    }
+
+
+    locationEditMarker =
+        L.marker(
+            [lat, lng]
+        ).addTo(
+            locationEditMap
+        );
+
+
+    locationEditMap.setView(
+        [lat, lng],
+        16
+    );
+
+
+    const latEl =
+        document.getElementById(
+            "locationLat"
+        );
+
+
+    const lngEl =
+        document.getElementById(
+            "locationLng"
+        );
+
+
+    if (latEl) {
+        latEl.value =
+            lat;
+    }
+
+
+    if (lngEl) {
+        lngEl.value =
+            lng;
+    }
+
+}
+
+
+window.useLocationGPS =
+    function() {
+
+        if (
+            !navigator.geolocation
+        ) {
+
+            alert(
+                "Browser tidak mendukung GPS."
+            );
+
+            return;
+
+        }
+
+
+        navigator.geolocation.getCurrentPosition(
+
+            position => {
+
+                setLocationEditMarker(
+
+                    position.coords.latitude,
+
+                    position.coords.longitude
+
+                );
+
+            },
+
+            error => {
+
+                alert(
+                    "Gagal mengambil lokasi: " +
+                    error.message
+                );
+
+            },
+
+            {
+                enableHighAccuracy: true,
+                timeout: 10000
+            }
+
+        );
+
+    };
+
+
+// =====================================================
+// SAVE LOCATION
+// =====================================================
+
+window.saveLocation =
+    async function() {
+
+        const id =
+            document.getElementById(
+                "locationDocId"
+            ).value.trim();
+
+
+        const nama =
+            document.getElementById(
+                "locationName"
+            ).value.trim();
+
+
+        const tipe =
+            document.getElementById(
+                "locationType"
+            ).value;
+
+
+        const lat =
+            parseFloat(
+                document.getElementById(
+                    "locationLat"
+                ).value
+            );
+
+
+        const lng =
+            parseFloat(
+                document.getElementById(
+                    "locationLng"
+                ).value
+            );
+
+
+        const radius =
+            parseInt(
+                document.getElementById(
+                    "locationRadius"
+                ).value
+            ) || 100;
+
+
+        if (!nama) {
+
+            alert(
+                "Nama lokasi wajib diisi."
+            );
+
+            return;
+
+        }
+
+
+        if (
+            isNaN(lat) ||
+            isNaN(lng)
+        ) {
+
+            alert(
+                "Latitude dan longitude wajib diisi."
+            );
+
+            return;
+
+        }
+
+
+        try {
+
+            showLoading(true);
+
+
+            const locationData = {
+
+                nama,
+
+                tipe,
+
+                lat,
+
+                lng,
+
+                radius,
+
+                updatedAt:
+                    serverTimestamp()
+
+            };
+
+
+            if (id) {
+
+                await updateDoc(
+                    doc(
+                        db,
+                        "lokasi",
+                        id
+                    ),
+                    locationData
+                );
+
+
+                alert(
+                    "✅ Lokasi berhasil diperbarui."
+                );
+
+            } else {
+
+                locationData.createdAt =
+                    serverTimestamp();
+
+
+                await addDoc(
+                    collection(
+                        db,
+                        "lokasi"
+                    ),
+                    locationData
+                );
+
+
+                alert(
+                    "✅ Lokasi berhasil ditambahkan."
+                );
+
+            }
+
+
+            clearCache();
+
+            await loadLocations();
+
+            await loadFilterOptions();
+
+            await loadStats(true);
+
+            resetLocationForm();
+
+            await initMapMonitoring();
+
+
+        } catch (error) {
+
+            console.error(
+                "Save lokasi:",
+                error
+            );
+
+
+            alert(
+                "❌ Gagal: " +
+                error.message
+            );
+
+        } finally {
+
+            showLoading(false);
+
+        }
+
+    };
+
+
+// =====================================================
+// DELETE LOCATION
+// =====================================================
+
+window.deleteLocation =
+    async function(id) {
+
+        const location =
+            allLocations.find(
+                item =>
+                    item.id === id
+            );
+
+
+        if (!location) {
+            return;
+        }
+
+
+        if (
+            !confirm(
+                `Hapus lokasi "${location.nama}"?`
+            )
+        ) {
+            return;
+        }
+
+
+        try {
+
+            showLoading(true);
+
+
+            await deleteDoc(
+                doc(
+                    db,
+                    "lokasi",
+                    id
+                )
+            );
+
+
+            alert(
+                "✅ Lokasi berhasil dihapus."
+            );
+
+
+            clearCache();
+
+            await loadLocations();
+
+            await loadFilterOptions();
+
+            await loadStats(true);
+
+            await initMapMonitoring();
+
+
+        } catch (error) {
+
+            console.error(
+                "Delete lokasi:",
+                error
+            );
+
+
+            alert(
+                "❌ Gagal menghapus: " +
+                error.message
+            );
+
+        } finally {
+
+            showLoading(false);
+
+        }
+
+    };
+
+
+// =====================================================
+// REFRESH
+// =====================================================
+
+window.refreshAdminData =
+    async function() {
+
+        try {
+
+            showLoading(true);
+
+            clearCache();
+
+            await loadUsers(true);
+
+            await loadStats(true);
+
+            await loadFilterOptions();
+
+            await loadPresensi();
+
+            await loadLocations();
+
+            await loadLocationModeStatus();
+
+            await initMapMonitoring();
+
+            alert(
+                "✅ Data berhasil diperbarui."
+            );
+
+        } catch (error) {
+
+            alert(
+                "❌ Refresh gagal: " +
+                error.message
+            );
+
+        } finally {
+
+            showLoading(false);
+
+        }
+
+    };
+
+
+// =====================================================
+// RESET DEVICE
+// =====================================================
+
+window.resetDevice =
+    async function(uid) {
+
+        if (
+            !uid ||
+            uid === "undefined"
+        ) {
+
+            alert(
+                "❌ UID user tidak valid."
+            );
+
+            return;
+
+        }
+
+
+        if (
+            !confirm(
+                "⚠️ Yakin ingin reset device user ini?"
+            )
+        ) {
+
+            return;
+
+        }
+
+
+        try {
+
+            showLoading(true);
+
+
+            const result =
+                await resetUserDevice(
+                    uid
+                );
+
+
+            if (
+                result &&
+                result.success
+            ) {
+
+                alert(
+                    "✅ Device berhasil direset."
+                );
+
+            } else {
+
+                throw new Error(
+                    result?.message ||
+                    "Reset device gagal."
+                );
+
+            }
+
+
+            clearCache();
+
+            await loadUsers(true);
+
+            await loadPresensi();
+
+
+        } catch (error) {
+
+            console.error(
+                error
+            );
+
+
+            alert(
+                "❌ Gagal: " +
+                error.message
+            );
+
+        } finally {
+
+            showLoading(false);
+
+        }
+
+    };
+
+
+// =====================================================
+// RESET SEMUA DEVICE
+// =====================================================
+
+window.resetAllDevices =
+    async function() {
+
+        if (
+            !confirm(
+                "⚠️ RESET SEMUA DEVICE USER?"
+            )
+        ) {
+
+            return;
+
+        }
+
+
+        try {
+
+            showLoading(true);
+
+
+            const snapshot =
+                await getDocs(
+                    collection(
+                        db,
+                        "users"
+                    )
+                );
+
+
+            let success = 0;
+
+
+            for (
+                const userDoc
+                of snapshot.docs
+            ) {
+
+                await updateDoc(
+                    doc(
+                        db,
+                        "users",
+                        userDoc.id
+                    ),
+                    {
+
+                        deviceId:
+                            null,
+
+                        deviceResetAt:
+                            serverTimestamp()
+
+                    }
+                );
+
+
+                success++;
+
+            }
+
+
+            alert(
+                `✅ ${success} user berhasil direset device.`
+            );
+
+
+            clearCache();
+
+            await loadUsers(true);
+
+            await loadPresensi();
+
+
+        } catch (error) {
+
+            console.error(
+                error
+            );
+
+
+            alert(
+                "❌ Gagal: " +
+                error.message
+            );
+
+        } finally {
+
+            showLoading(false);
+
+        }
+
+    };
+
+
+// =====================================================
+// LOKASI SEMENTARA
+// =====================================================
+
+function initTemporaryMap() {
+
+    const tempMapDiv =
+        document.getElementById(
+            "tempMap"
+        );
+
+
+    if (!tempMapDiv) return;
+
+
+    if (
+        typeof L ===
+        "undefined"
+    ) {
+
+        return;
+
+    }
+
+
+    if (tempMap) {
+
+        tempMap.remove();
+
+    }
+
+
+    tempMap =
+        L.map(
+            "tempMap"
+        ).setView(
+            [-7.4706, 110.2177],
+            13
+        );
+
+
+    L.tileLayer(
+        "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+        {
+            attribution:
+                "&copy; OpenStreetMap"
+        }
+    ).addTo(
+        tempMap
+    );
+
+
+    tempMap.on(
+        "click",
+        event => {
+
+            setTemporaryMarker(
+                event.latlng.lat,
+                event.latlng.lng
+            );
+
+        }
+    );
+
+}
+
+
+function setTemporaryMarker(
+    lat,
+    lng
+) {
+
+    const latInput =
+        document.getElementById(
+            "tempLat"
+        );
+
+
+    const lngInput =
+        document.getElementById(
+            "tempLng"
+        );
+
+
+    if (latInput) {
+        latInput.value =
+            lat;
+    }
+
+
+    if (lngInput) {
+        lngInput.value =
+            lng;
+    }
+
+
+    if (tempMarker) {
+
+        tempMap.removeLayer(
+            tempMarker
+        );
+
+    }
+
+
+    tempMarker =
+        L.marker(
+            [lat, lng]
+        ).addTo(
+            tempMap
+        );
+
+
+    tempMap.setView(
+        [lat, lng],
+        16
+    );
+
+}
+
+
+window.useCurrentAdminLocation =
+    function() {
+
+        if (
+            !navigator.geolocation
+        ) {
+
+            alert(
+                "Browser tidak mendukung GPS."
+            );
+
+            return;
+
+        }
+
+
+        navigator.geolocation.getCurrentPosition(
+
+            position => {
+
+                setTemporaryMarker(
+
+                    position.coords.latitude,
+
+                    position.coords.longitude
+
+                );
+
+            },
+
+            () => {
+
+                alert(
+                    "Gagal mengambil lokasi."
+                );
+
+            }
+
+        );
+
+    };
+
+
+window.saveTemporaryLocation =
+    async function() {
+
+        try {
+
+            const name =
+                document.getElementById(
+                    "tempLocationName"
+                ).value.trim();
+
+
+            const lat =
+                parseFloat(
+                    document.getElementById(
+                        "tempLat"
+                    ).value
+                );
+
+
+            const lng =
+                parseFloat(
+                    document.getElementById(
+                        "tempLng"
+                    ).value
+                );
+
+
+            const radius =
+                parseInt(
+                    document.getElementById(
+                        "tempRadius"
+                    ).value
+                ) || 100;
+
+
+            const start =
+                document.getElementById(
+                    "tempStart"
+                ).value;
+
+
+            const end =
+                document.getElementById(
+                    "tempEnd"
+                ).value;
+
+
+            if (
+                isNaN(lat) ||
+                isNaN(lng)
+            ) {
+
+                alert(
+                    "Pilih titik lokasi terlebih dahulu."
+                );
+
+                return;
+
+            }
+
+
+            if (!start || !end) {
+
+                alert(
+                    "Isi waktu mulai dan selesai."
+                );
+
+                return;
+
+            }
+
+
+            if (
+                new Date(end) <=
+                new Date(start)
+            ) {
+
+                alert(
+                    "Waktu selesai harus lebih besar dari waktu mulai."
+                );
+
+                return;
+
+            }
+
+
+            showLoading(true);
+
+
+            await setDoc(
+
+                doc(
+                    db,
+                    "system_settings",
+                    "global"
+                ),
+
+                {
+
+                    temporaryLocationEnabled:
+                        true,
+
+                    statusLokasi:
+                        "custom",
+
+                    temporaryLocationName:
+                        name,
+
+                    temporaryLatitude:
+                        lat,
+
+                    temporaryLongitude:
+                        lng,
+
+                    temporaryRadius:
+                        radius,
+
+                    temporaryStart:
+                        start,
+
+                    temporaryEnd:
+                        end,
+
+                    updatedAt:
+                        serverTimestamp()
+
+                },
+
+                {
+                    merge: true
+                }
+
+            );
+
+
+            alert(
+                "✅ Lokasi sementara berhasil diaktifkan."
+            );
+
+
+            await loadLocationModeStatus();
+
+
+        } catch (error) {
+
+            alert(
+                "❌ Gagal menyimpan: " +
+                error.message
+            );
+
+        } finally {
+
+            showLoading(false);
+
+        }
+
+    };
+
+
+window.disableTemporaryLocation =
+    async function() {
+
+        if (
+            !confirm(
+                "Kembalikan ke lokasi normal?"
+            )
+        ) {
+
+            return;
+
+        }
+
+
+        try {
+
+            showLoading(true);
+
+
+            await updateDoc(
+
+                doc(
+                    db,
+                    "system_settings",
+                    "global"
+                ),
+
+                {
+
+                    temporaryLocationEnabled:
+                        false,
+
+                    statusLokasi:
+                        "default",
+
+                    updatedAt:
+                        serverTimestamp()
+
+                }
+
+            );
+
+
+            alert(
+                "✅ Lokasi normal dipulihkan."
+            );
+
+
+            await loadLocationModeStatus();
+
+
+        } catch (error) {
+
+            alert(
+                "❌ Gagal: " +
+                error.message
+            );
+
+        } finally {
+
+            showLoading(false);
+
+        }
+
+    };
+
+
+async function loadTemporaryLocation() {
+
+    try {
+
+        const snap =
+            await getDoc(
+                doc(
+                    db,
+                    "system_settings",
+                    "global"
+                )
+            );
+
+
+        if (
+            !snap.exists()
+        ) {
+
+            return;
+
+        }
+
+
+        const data =
+            snap.data();
+
+
+        if (
+            data.temporaryLocationEnabled
+        ) {
+
+            document.getElementById(
+                "tempLocationName"
+            ).value =
+                data.temporaryLocationName ||
+                "";
+
+
+            document.getElementById(
+                "tempRadius"
+            ).value =
+                data.temporaryRadius ||
+                100;
+
+
+            document.getElementById(
+                "tempStart"
+            ).value =
+                data.temporaryStart ||
+                "";
+
+
+            document.getElementById(
+                "tempEnd"
+            ).value =
+                data.temporaryEnd ||
+                "";
+
+
+            if (
+                data.temporaryLatitude !==
+                    undefined &&
+                data.temporaryLongitude !==
+                    undefined
+            ) {
+
+                setTemporaryMarker(
+                    data.temporaryLatitude,
+                    data.temporaryLongitude
+                );
+
+            }
+
+        }
+
+    } catch (error) {
+
+        console.log(
+            "Lokasi sementara tidak ditemukan."
+        );
+
+    }
+
+}
+
+
+// =====================================================
+// STATUS LOKASI
+// =====================================================
+
+async function loadLocationModeStatus() {
+
+    try {
+
+        const snap =
+            await getDoc(
+                doc(
+                    db,
+                    "system_settings",
+                    "global"
+                )
+            );
+
+
+        const el =
+            document.getElementById(
+                "locationModeStatus"
+            );
+
+
+        if (!el) return;
+
+
+        if (
+            !snap.exists()
+        ) {
+
+            el.innerHTML =
+                "⚪ Menggunakan lokasi default.";
+
+            return;
+
+        }
+
+
+        const data =
+            snap.data();
+
+
+        const now =
+            new Date();
+
+
+        const start =
+            data.temporaryStart
+                ? new Date(
+                    data.temporaryStart
+                )
+                : null;
+
+
+        const end =
+            data.temporaryEnd
+                ? new Date(
+                    data.temporaryEnd
+                )
+                : null;
+
+
+        const active =
+            data.temporaryLocationEnabled &&
+            start &&
+            end &&
+            now >= start &&
+            now <= end;
+
+
+        if (active) {
+
+            el.innerHTML = `
+
+                🟣
+                <b>
+                    Lokasi sementara aktif
+                </b>
+
+                <br>
+
+                Nama:
+                ${escapeHtml(
+                    data.temporaryLocationName ||
+                    "-"
+                )}
+
+                <br>
+
+                Radius:
+                ${data.temporaryRadius || 100}
+                meter
+
+            `;
+
+        } else {
+
+            el.innerHTML =
+                "🟢 Menggunakan lokasi default (kantor/kelurahan).";
+
+        }
+
+    } catch (error) {
+
+        console.error(
+            error
+        );
+
+    }
+
+}
+
+
+// =====================================================
+// FILTER PRESENSI
+// =====================================================
+
+window.applyFilter =
+    function() {
+
+        const kelurahan =
+            document.getElementById(
+                "filterKelurahan"
+            );
+
+
+        const tanggal =
+            document.getElementById(
+                "filterTanggal"
+            );
+
+
+        if (kelurahan) {
+
+            currentFilter.kelurahan =
+                kelurahan.value;
+
+        }
+
+
+        if (tanggal) {
+
+            currentFilter.tanggal =
+                tanggal.value;
+
+        }
+
+
+        clearCache();
+
+        loadStats(true);
+
+        loadPresensi();
+
+    };
+
+
+window.resetFilter =
+    function() {
+
+        currentFilter.kelurahan =
+            "";
+
+
+        currentFilter.tanggal =
+            getTodayLocal();
+
+
+        const kelurahan =
+            document.getElementById(
+                "filterKelurahan"
+            );
+
+
+        const tanggal =
+            document.getElementById(
+                "filterTanggal"
+            );
+
+
+        if (kelurahan) {
+
+            kelurahan.value =
+                "";
+
+        }
+
+
+        if (tanggal) {
+
+            tanggal.value =
+                currentFilter.tanggal;
+
+        }
+
+
+        clearCache();
+
+        loadStats(true);
+
+        loadPresensi();
+
+    };
+
+
+// =====================================================
+// MAP MONITORING
+// =====================================================
 
 async function initMapMonitoring() {
-  map = initMap("map", -7.4706, 110.2177, 12);
-  if (!map) return;
 
-  const lokasiSnap = await getDocs(collection(db, "lokasi"));
-  lokasiSnap.forEach(d => {
-    const data = d.data();
-    addMarker(map, data.lat, data.lng, data.nama, data.tipe === "kantor" ? "kantor" : "kelurahan");
-  });
+    try {
 
-  const presensiSnap = await getDocs(query(
-    collection(db, "presensi"),
-    where("tanggal", "==", currentFilter.tanggal)
-  ));
-  presensiSnap.forEach(d => {
-    const data = d.data();
-    if (data.lat != null && data.lng != null) addMarker(map, data.lat, data.lng, data.nama || "User", "user");
-  });
+        const mapEl =
+            document.getElementById(
+                "map"
+            );
+
+
+        if (!mapEl) return;
+
+
+        if (map) {
+
+            map.remove();
+
+        }
+
+
+        map =
+            initMap(
+                "map",
+                -7.4706,
+                110.2177,
+                12
+            );
+
+
+        if (!map) return;
+
+
+        const lokasiSnap =
+            await getDocs(
+                collection(
+                    db,
+                    "lokasi"
+                )
+            );
+
+
+        lokasiSnap.forEach(
+            locationDoc => {
+
+                const data =
+                    locationDoc.data();
+
+
+                if (
+                    data.lat !== undefined &&
+                    data.lng !== undefined
+                ) {
+
+                    addMarker(
+
+                        map,
+
+                        data.lat,
+
+                        data.lng,
+
+                        data.nama ||
+                            "Lokasi",
+
+                        data.tipe ===
+                            "kantor"
+                            ? "kantor"
+                            : "kelurahan"
+
+                    );
+
+                }
+
+            }
+        );
+
+
+        const presensiSnap =
+            await getDocs(
+                query(
+                    collection(
+                        db,
+                        "presensi"
+                    ),
+                    where(
+                        "tanggal",
+                        "==",
+                        currentFilter.tanggal
+                    )
+                )
+            );
+
+
+        presensiSnap.forEach(
+            presensiDoc => {
+
+                const data =
+                    presensiDoc.data();
+
+
+                if (
+                    data.lat &&
+                    data.lng
+                ) {
+
+                    addMarker(
+
+                        map,
+
+                        data.lat,
+
+                        data.lng,
+
+                        data.nama ||
+                            "User",
+
+                        "user"
+
+                    );
+
+                }
+
+            }
+        );
+
+
+    } catch (error) {
+
+        console.error(
+            "Map monitoring:",
+            error
+        );
+
+    }
+
 }
 
-function startRealtimeListeners() {
-  onSnapshot(collection(db, "users"), snapshot => {
-    allUsers = snapshot.docs.map(d => ({ uid: d.id, ...d.data() }));
-    allUsers.sort((a,b) => String(a.nama || "").localeCompare(String(b.nama || ""), "id"));
-    renderUsers();
-    invalidateCaches();
-    loadStats(true);
-  }, console.error);
 
-  onSnapshot(collection(db, "lokasi"), snapshot => {
-    allLocations = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-    allLocations.sort((a,b) => String(a.nama || "").localeCompare(String(b.nama || ""), "id"));
-    renderLocations();
-    invalidateCaches();
-    loadFilterOptions();
-    loadStats(true);
-  }, console.error);
+// =====================================================
+// IMPORT EXCEL
+// =====================================================
 
-  onSnapshot(query(collection(db, "presensi"), where("tanggal", "==", currentFilter.tanggal)), snapshot => {
-    invalidateCaches();
-    loadStats(true);
-    loadPresensi(currentPage);
-  }, console.error);
-}
+window.handleFileSelect =
+    async function(event) {
 
-window.handleFileSelect = async function(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-  if (!/\.(xlsx|xls)$/i.test(file.name)) return alert("Format file harus .xlsx atau .xls");
-  if (!confirm(`Import data dari "${file.name}"?`)) return;
+        const file =
+            event.target.files[0];
 
-  const progressDiv = document.getElementById("importProgress");
-  const progressBar = document.getElementById("importProgressBar");
-  const status = document.getElementById("importStatus");
-  progressDiv.style.display = "block";
-  progressBar.style.width = "10%";
-  status.textContent = "Membaca file...";
-  showLoading(true);
 
-  try {
-    const result = await importFromExcel(file, pct => {
-      progressBar.style.width = `${pct}%`;
-      status.textContent = `Memproses ${pct}%...`;
-    });
-    progressBar.style.width = "100%";
-    status.textContent = "Selesai!";
-    alert(`✅ IMPORT SELESAI\n\nUser: ${result.users}\nLokasi: ${result.lokasi}\nDilewati: ${result.skipped}\nError: ${result.errors?.length || 0}`);
-    invalidateCaches();
-    await loadAllUsers();
-    await loadLocations();
-    await loadFilterOptions();
-    await loadStats(true);
-    await loadPresensi(1);
-  } catch (error) {
-    console.error(error);
-    alert("❌ Gagal import: " + error.message);
-    status.textContent = "Gagal.";
-  } finally {
-    showLoading(false);
-    event.target.value = "";
-    setTimeout(() => progressDiv.style.display = "none", 3000);
-  }
-};
+        if (!file) return;
 
-window.exportData = async function() {
-  showLoading(true);
-  try { await exportToExcel(currentFilter.tanggal); }
-  catch (e) { alert("Gagal export: " + e.message); }
-  finally { showLoading(false); }
-};
 
-window.downloadTemplate = function() {
-  const template = [
-    ["USER"],
-    ["nama","email","password","role","kecamatan","kelurahan","kota","active","deviceCheckEnabled"],
-    ["Budi","budi@mail.com","123456","user","","Magelang Tengah","Magelang",true,true],
-    [""],
-    ["LOKASI"],
-    ["nama","tipe","lat","lng","radius"],
-    ["Kantor Pusat","kantor","-7.4706","110.2177",100]
-  ];
-  const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.aoa_to_sheet(template);
-  XLSX.utils.book_append_sheet(wb, ws, "USER");
-  XLSX.writeFile(wb, "template_import.xlsx");
-};
+        if (
+            !file.name.match(
+                /\.(xlsx|xls)$/
+            )
+        ) {
 
-window.addEventListener("load", async () => {
-  showLoading(true);
-  try {
-    document.getElementById("logoutBtn")?.addEventListener("click", logout);
-    document.getElementById("filterTanggal").value = currentFilter.tanggal;
+            alert(
+                "❌ Format file harus .xlsx atau .xls."
+            );
 
-    onAuthStateChanged(auth, async user => {
-      if (!user) {
-        window.location.replace("index.html");
-        return;
-      }
+            return;
 
-      const callerDoc = await getDoc(doc(db, "users", user.uid));
-      if (!callerDoc.exists() || callerDoc.data().role !== "admin") {
-        alert("Akses hanya untuk admin.");
-        await signOut(auth);
-        window.location.replace("index.html");
-        return;
-      }
+        }
 
-      document.getElementById("adminName").textContent = callerDoc.data().nama || user.email || "Admin";
-      startRealtimeListeners();
-      await Promise.all([
-        loadAllUsers(),
-        loadLocations(),
-        loadStats(true),
-        loadFilterOptions(),
-        loadPresensi(1),
-        loadTemporaryLocation(),
-        loadLocationModeStatus()
-      ]);
-      initTemporaryMap();
-      await initMapMonitoring();
-      setTimeout(createPaginationButtons, 300);
-    });
-  } catch (error) {
-    console.error("Admin init:", error);
-    alert("Gagal memuat Admin Panel: " + error.message);
-  } finally {
-    showLoading(false);
-  }
-});
+
+        if (
+            !confirm(
+                `Import data dari "${file.name}"?`
+            )
+        ) {
+
+            return;
+
+        }
+
+
+        const progressDiv =
+            document.getElementById(
+                "importProgress"
+            );
+
+
+        const progressBar =
+            document.getElementById(
+                "importProgressBar"
+            );
+
+
+        const progressStatus =
+            document.getElementById(
+                "importStatus"
+            );
+
+
+        if (progressDiv) {
+            progressDiv.style.display =
+                "block";
+        }
+
+
+        if (progressBar) {
+            progressBar.style.width =
+                "10%";
+        }
+
+
+        if (progressStatus) {
+            progressStatus.textContent =
+                "Membaca file...";
+        }
+
+
+        try {
+
+            showLoading(true);
+
+
+            const result =
+                await importFromExcel(
+                    file
+                );
+
+
+            if (progressBar) {
+                progressBar.style.width =
+                    "100%";
+            }
+
+
+            let message =
+                "✅ IMPORT SELESAI\n\n";
+
+
+            message +=
+                `User berhasil: ${result.users}\n`;
+
+
+            message +=
+                `Lokasi berhasil: ${result.lokasi}\n`;
+
+
+            message +=
+                `Dilewati: ${result.skipped}\n`;
+
+
+            if (
+                result.errors &&
+                result.errors.length
+            ) {
+
+                message +=
+                    `\nError: ${result.errors.length}`;
+
+            }
+
+
+            alert(
+                message
+            );
+
+
+            clearCache();
+
+
+            await loadUsers(true);
+
+            await loadStats(true);
+
+            await loadFilterOptions();
+
+            await loadPresensi();
+
+            await loadLocations();
+
+            await initMapMonitoring();
+
+
+        } catch (error) {
+
+            console.error(
+                "Import error:",
+                error
+            );
+
+
+            alert(
+                "❌ Gagal import: " +
+                error.message
+            );
+
+        } finally {
+
+            showLoading(false);
+
+
+            setTimeout(
+                () => {
+
+                    if (progressDiv) {
+
+                        progressDiv.style.display =
+                            "none";
+
+                    }
+
+                },
+                3000
+            );
+
+
+            event.target.value = "";
+
+        }
+
+    };
+
+
+// =====================================================
+// EXPORT
+// =====================================================
+
+window.exportData =
+    async function() {
+
+        try {
+
+            showLoading(true);
+
+            await exportToExcel(
+                currentFilter.tanggal
+            );
+
+        } catch (error) {
+
+            alert(
+                "❌ Gagal export: " +
+                error.message
+            );
+
+        } finally {
+
+            showLoading(false);
+
+        }
+
+    };
+
+
+// =====================================================
+// TEMPLATE
+// =====================================================
+
+window.downloadTemplate =
+    function() {
+
+        const template = [
+
+            ["USER"],
+
+            [
+                "nama",
+                "email",
+                "password",
+                "role",
+                "kecamatan",
+                "kelurahan",
+                "kota"
+            ],
+
+            [
+                "Budi",
+                "budi@mail.com",
+                "123456",
+                "user",
+                "Magelang Tengah",
+                "Magelang",
+                "Magelang"
+            ],
+
+            [""],
+
+            ["LOKASI"],
+
+            [
+                "nama",
+                "tipe",
+                "lat",
+                "lng",
+                "radius"
+            ],
+
+            [
+                "Kantor Pusat",
+                "kantor",
+                "-7.4706",
+                "110.2177",
+                "100"
+            ]
+
+        ];
+
+
+        const wb =
+            XLSX.utils.book_new();
+
+
+        const ws =
+            XLSX.utils.aoa_to_sheet(
+                template
+            );
+
+
+        XLSX.utils.book_append_sheet(
+            wb,
+            ws,
+            "Template"
+        );
+
+
+        XLSX.writeFile(
+            wb,
+            "template_import.xlsx"
+        );
+
+    };
