@@ -13,6 +13,7 @@ on:
 jobs:
   deploy_functions:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
 
@@ -22,7 +23,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Install functions dependencies
         working-directory: functions
@@ -33,3 +34,6 @@ jobs:
 
       - name: Deploy Functions
         run: firebase deploy --only functions --project presensi-fasilitator
+
+      - name: Get adminUserAction logs
+        run: firebase functions:log --only adminUserAction --project presensi-fasilitator
