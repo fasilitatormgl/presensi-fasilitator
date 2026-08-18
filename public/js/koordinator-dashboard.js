@@ -163,28 +163,26 @@ window.addEventListener('load', async () => {
 async function loadData() {
     try {
         const usersSnap = await getDocs(collection(db, "users"))
-
         allUsers = []
-
         usersSnap.forEach(doc => {
             const data = doc.data()
-
-            // Abaikan admin, pemantau, dan user yang sudah OUT
-            if (
-                data.role !== 'admin' &&
-                data.role !== 'pemantau'
-            ) {
-                allUsers.push({
+            if (data.role !== 'admin' && data.role !== 'pemantau') {
+                allUsers.push({  
                     id: doc.id,
                     uid: data.uid || doc.id,
-                    ...data
+                    ...data 
                 })
             }
         })
-
+        
+        const presensiSnap = await getDocs(collection(db, "presensi"))
+        allPresensi = []
+        presensiSnap.forEach(doc => {
+            allPresensi.push({ id: doc.id, ...doc.data() })
+        })
+        
     } catch (error) {
-        console.error("❌ Error load data:", error)
-        throw error
+        console.error("Error load data:", error)
     }
 }
 
