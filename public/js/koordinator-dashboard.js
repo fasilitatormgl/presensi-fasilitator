@@ -172,8 +172,7 @@ async function loadData() {
             // Abaikan admin, pemantau, dan user yang sudah OUT
             if (
                 data.role !== 'admin' &&
-                data.role !== 'pemantau' &&
-                data.role !== 'out'
+                data.role !== 'pemantau'
             ) {
                 allUsers.push({
                     id: doc.id,
