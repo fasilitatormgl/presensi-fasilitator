@@ -15,15 +15,23 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - uses: google-github-actions/auth@v2
+      - name: Authenticate Google Cloud
+        uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_PRESENSI_FASILITATOR }}
 
-      - uses: actions/setup-node@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: 22
+
+      - name: Check Node.js version
+        run: |
+          node --version
+          npm --version
 
       - name: Install functions dependencies
         working-directory: functions
@@ -32,8 +40,18 @@ jobs:
       - name: Install Firebase CLI
         run: npm install -g firebase-tools
 
+      - name: Check Firebase CLI
+        run: firebase --version
+
       - name: Deploy Functions
-        run: firebase deploy --only functions --project presensi-fasilitator
+        run: |
+          firebase deploy \
+            --only functions \
+            --project presensi-fasilitator
 
       - name: Get adminUserAction logs
-        run: firebase functions:log --only adminUserAction --project presensi-fasilitator
+        if: always()
+        run: |
+          firebase functions:log \
+            --only adminUserAction \
+            --project presensi-fasilitator
