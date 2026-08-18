@@ -1,5 +1,5 @@
 import { auth, db } from "./firebase-init.js"
-import { collection, addDoc, query, where, getDocs, getDoc, doc } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js"
+import { collection, addDoc, query, where, getDocs, getDoc, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js"
 import { signOut } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js"
 import { initMap, addMarker, calculateDistance, drawRadius } from "./map.js"
 import { validateDevice } from "./device.js"
@@ -79,6 +79,78 @@ function showLoading(show) {
 function safeSetText(elementId, text) {
     const element = document.getElementById(elementId)
     if (element) element.textContent = text
+}
+
+
+// ========== REALTIME USER PROFILE ==========
+let stopUserListener = null;
+
+function getLocationRadius(location, fallback = 100) {
+    const value = Number(location?.radius);
+    return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+function saveUserDataToLocalStorage() {
+    localStorage.setItem("userData", JSON.stringify(userData));
+}
+
+function refreshDashboardAfterUserChange() {
+    if (userData.kelurahan) {
+        const key = `kelurahan_${userData.kelurahan}`;
+        delete lokasiCache[key];
+    }
+    if (userData.kota) {
+        const key = `kota_${userData.kota}`;
+        delete lokasiCache[key];
+    }
+
+    lokasiKelurahan = null;
+    lokasiKota = null;
+
+    loadLokasi().then(() => {
+        if (latUser != null && lngUser != null) {
+            hitungSemuaJarak();
+            initMapWithLocations();
+        }
+    }).catch(console.error);
+
+    safeSetText("userName", userData.nama || "Fasilitator");
+    safeSetText("avatar", (userData.nama || "U").charAt(0).toUpperCase());
+    safeSetText("userRole", userData.role || "User");
+}
+
+function listenToCurrentUser() {
+    if (!auth.currentUser) return;
+
+    const userRef = doc(db, "users", auth.currentUser.uid);
+
+    if (stopUserListener) stopUserListener();
+
+    stopUserListener = onSnapshot(userRef, snapshot => {
+        if (!snapshot.exists()) {
+            alert("Data akun Anda sudah dihapus oleh admin.");
+            auth.signOut();
+            return;
+        }
+
+        const latest = snapshot.data();
+
+        if (latest.active === false) {
+            alert("Akun Anda dinonaktifkan oleh admin.");
+            auth.signOut();
+            return;
+        }
+
+        userData = {
+            uid: auth.currentUser.uid,
+            ...latest
+        };
+
+        saveUserDataToLocalStorage();
+        refreshDashboardAfterUserChange();
+    }, error => {
+        console.error("Realtime user listener:", error);
+    });
 }
 
 // ========== INIT DASHBOARD ==========
@@ -339,19 +411,19 @@ function initMapWithLocations() {
         // 2. Tampilkan Marker & Radius KANTOR PUSAT
         if (lokasiKantor) {
             addMarker(map, lokasiKantor.lat, lokasiKantor.lng, 'Kantor Pusat', 'kantor')
-            drawRadius(map, lokasiKantor.lat, lokasiKantor.lng, 100, '#EE2737')
+            drawRadius(map, lokasiKantor.lat, lokasiKantor.lng, getLocationRadius(lokasiKantor), '#EE2737')
         }
 
         // 3. Tampilkan Marker & Radius KELURAHAN DAMPINGAN
         if (lokasiKelurahan) {
             addMarker(map, lokasiKelurahan.lat, lokasiKelurahan.lng, `Kelurahan: ${lokasiKelurahan.nama}`, 'kelurahan')
-            drawRadius(map, lokasiKelurahan.lat, lokasiKelurahan.lng, 100, '#3498DB')
+            drawRadius(map, lokasiKelurahan.lat, lokasiKelurahan.lng, getLocationRadius(lokasiKelurahan), '#3498DB')
         }
 
         // 4. Tampilkan Marker & Radius KOTA DAMPINGAN
         if (lokasiKota) {
             addMarker(map, lokasiKota.lat, lokasiKota.lng, `Kota: ${lokasiKota.nama}`, 'kantor')
-            drawRadius(map, lokasiKota.lat, lokasiKota.lng, 100, '#E67E22')
+            drawRadius(map, lokasiKota.lat, lokasiKota.lng, getLocationRadius(lokasiKota), '#E67E22')
         }
 
         setTimeout(() => map.invalidateSize(), 300)
@@ -404,17 +476,17 @@ function hitungSemuaJarak() {
         const jarakKel = calculateDistance(latUser, lngUser, lokasiKelurahan.lat, lokasiKelurahan.lng)
         safeSetText("jarakKelurahan", `Jarak: ${jarakKel} m`)
         
-        const progressKel = Math.min((jarakKel / 100) * 100, 100)
+        const radiusKel = getLocationRadius(lokasiKelurahan);\n        const progressKel = Math.min((jarakKel / radiusKel) * 100, 100)
         const progressBarKel = document.getElementById("progressKelurahan")
         if (progressBarKel) {
             progressBarKel.style.width = progressKel + '%'
-            if (jarakKel <= 100) progressBarKel.classList.add('safe')
+            if (jarakKel <= radiusKel) progressBarKel.classList.add('safe')
             else progressBarKel.classList.remove('safe')
         }
         
         const statusKelurahan = document.getElementById("statusKelurahan")
         if (statusKelurahan) {
-            if (jarakKel <= 100) {
+            if (jarakKel <= radiusKel) {
                 statusKelurahan.innerHTML = '✅ Dalam radius'
                 statusKelurahan.className = 'distance-status safe'
             } else {
@@ -432,17 +504,17 @@ function hitungSemuaJarak() {
         const jarakKota = calculateDistance(latUser, lngUser, lokasiKota.lat, lokasiKota.lng)
         safeSetText("jarakKota", `Jarak: ${jarakKota} m`)
         
-        const progressKota = Math.min((jarakKota / 100) * 100, 100)
+        const radiusKota = getLocationRadius(lokasiKota);\n        const progressKota = Math.min((jarakKota / radiusKota) * 100, 100)
         const progressBarKota = document.getElementById("progressKota")
         if (progressBarKota) {
             progressBarKota.style.width = progressKota + '%'
-            if (jarakKota <= 100) progressBarKota.classList.add('safe')
+            if (jarakKota <= getLocationRadius(lokasiKota)) progressBarKota.classList.add('safe')
             else progressBarKota.classList.remove('safe')
         }
         
         const statusKota = document.getElementById("statusKota")
         if (statusKota) {
-            if (jarakKota <= 100) {
+            if (jarakKota <= getLocationRadius(lokasiKota)) {
                 statusKota.innerHTML = '✅ Dalam radius'
                 statusKota.className = 'distance-status safe'
             } else {
@@ -457,17 +529,17 @@ function hitungSemuaJarak() {
         const jarakKantor = calculateDistance(latUser, lngUser, lokasiKantor.lat, lokasiKantor.lng)
         safeSetText("jarakKantor", `Jarak: ${jarakKantor} m`)
         
-        const progressKan = Math.min((jarakKantor / 100) * 100, 100)
+        const radiusKantor = getLocationRadius(lokasiKantor);\n        const progressKan = Math.min((jarakKantor / radiusKantor) * 100, 100)
         const progressBarKan = document.getElementById("progressKantor")
         if (progressBarKan) {
             progressBarKan.style.width = progressKan + '%'
-            if (jarakKantor <= 100) progressBarKan.classList.add('safe')
+            if (jarakKantor <= getLocationRadius(lokasiKantor)) progressBarKan.classList.add('safe')
             else progressBarKan.classList.remove('safe')
         }
         
         const statusKantor = document.getElementById("statusKantor")
         if (statusKantor) {
-            if (jarakKantor <= 100) {
+            if (jarakKantor <= getLocationRadius(lokasiKantor)) {
                 statusKantor.innerHTML = '✅ Dalam radius'
                 statusKantor.className = 'distance-status safe'
             } else {
@@ -605,7 +677,7 @@ async function presensi() {
             // OPSI 2: Pengecekan Kelurahan Dampingan (Maksimal radius 100m)
             if (!lokasiPresensi && lokasiKelurahan) {
                 const jarakKelurahan = calculateDistance(latUser, lngUser, lokasiKelurahan.lat, lokasiKelurahan.lng)
-                if (jarakKelurahan <= 100) {
+                if (jarakKelurahan <= getLocationRadius(lokasiKelurahan)) {
                     lokasiPresensi = "kelurahan"
                 }
             }
@@ -613,7 +685,7 @@ async function presensi() {
             // OPSI 3: Pengecekan Wilayah Kota Dampingan (Maksimal radius 100m)
             if (!lokasiPresensi && lokasiKota) {
                 const jarakKota = calculateDistance(latUser, lngUser, lokasiKota.lat, lokasiKota.lng)
-                if (jarakKota <= 100) {
+                if (jarakKota <= getLocationRadius(lokasiKota)) {
                     lokasiPresensi = "kota"
                 }
             }
@@ -621,7 +693,7 @@ async function presensi() {
             // OPSI CADANGAN: Kantor Pusat
             if (!lokasiPresensi && lokasiKantor) {
                 const jarakKantor = calculateDistance(latUser, lngUser, lokasiKantor.lat, lokasiKantor.lng)
-                if (jarakKantor <= 100) {
+                if (jarakKantor <= getLocationRadius(lokasiKantor)) {
                     lokasiPresensi = "kantor"
                 }
             }
