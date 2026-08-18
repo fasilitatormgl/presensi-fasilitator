@@ -102,7 +102,7 @@ async function loadData() {
         usersSnap.forEach(doc => {
             const data = doc.data()
             // Abaikan admin & pemantau
-            if (data.role !== 'admin' && data.role !== 'pemantau' && data.role !== 'Out') {
+            if (data.role !== 'admin' && data.role !== 'pemantau') {
                 allUsers.push({
                     id: doc.id,
                     uid: data.uid || doc.id,
