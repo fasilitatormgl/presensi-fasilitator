@@ -61,6 +61,12 @@ window.login = async function() {
                 await auth.signOut();
                 return
             }
+
+            if (userData.active === false) {
+                alert("Akun Anda sedang dinonaktifkan oleh admin.")
+                await auth.signOut();
+                return
+            }
             
             // Simpan data esensial ke localStorage sebagai cadangan
             localStorage.setItem("userData", JSON.stringify({
