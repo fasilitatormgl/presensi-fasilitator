@@ -95,17 +95,6 @@ export async function validateDevice(uid) {
         }
         
         console.log("User role:", userData.role)
-
-        if (userData.active === false) {
-            console.log("🚫 Akun dinonaktifkan");
-            return false;
-        }
-
-        if (userData.deviceCheckEnabled === false) {
-            console.log("🔓 Device check dinonaktifkan oleh admin");
-            await updateDoc(userRef, { lastSeen: new Date() });
-            return true;
-        }
         
         // HAK ISTIMEWA: ADMIN & KOORDINATOR BEBAS PENGUNCIAN DEVICE
         if (userData.role === 'admin' || userData.role === 'koordinator') {
