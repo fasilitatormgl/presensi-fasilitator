@@ -23,19 +23,19 @@
     </div>
     
     <!-- GREETING CARD -->
-<div class="greeting-card">
-    <div class="greeting-avatar" id="avatar">👤</div>
-    <div class="greeting-text">
-        <div class="greeting-hello">Halo, Selamat Datang</div>
-        
-        <div style="display: flex; align-items: center; gap: 8px;">
-            <img src="absensifasil.png" alt="Logo" style="height: 30px; width: auto; object-fit: contain;">
-            <div class="greeting-name" id="userName">Fasilitator</div>
+    <div class="greeting-card">
+        <div class="greeting-avatar" id="avatar">👤</div>
+        <div class="greeting-text">
+            <div class="greeting-hello">Halo, Selamat Datang</div>
+            
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <img src="absensifasil.png" alt="Logo" style="height: 30px; width: auto; object-fit: contain;">
+                <div class="greeting-name" id="userName">Fasilitator</div>
+            </div>
+            
+            <div class="greeting-role" id="userRole">User</div>
         </div>
-        
-        <div class="greeting-role" id="userRole">User</div>
     </div>
-</div>
     
     <!-- STATUS PRESENSI -->
     <div class="card">
@@ -80,56 +80,56 @@
     
     <!-- LOKASI PRESENSI -->
     <div class="card">
-    <div class="card-title">
-        <span class="card-icon">📍</span>
-        <h3>Titik Presensi</h3>
-    </div>
-    <div class="location-list">
-        
-        <div class="location-item" id="lokasiSementara" style="display: none;">
-            <div class="location-header">
-                <span class="location-icon">🎪</span>
-                <div class="location-info">
-                    <div class="location-name" id="namaSementara">Lokasi Tugas Sementara</div>
-                    <div class="location-distance" id="jarakSementara">Menghitung jarak...</div>
-                </div>
-            </div>
-            <div class="distance-bar-container">
-                <div class="distance-bar" id="progressSementara" style="width: 0%"></div>
-            </div>
-            <div class="distance-status" id="statusSementara">📍 Di luar radius</div>
+        <div class="card-title">
+            <span class="card-icon">📍</span>
+            <h3>Titik Presensi</h3>
         </div>
+        <div class="location-list">
+            
+            <div class="location-item" id="lokasiSementara" style="display: none;">
+                <div class="location-header">
+                    <span class="location-icon">🎪</span>
+                    <div class="location-info">
+                        <div class="location-name" id="namaSementara">Lokasi Tugas Sementara</div>
+                        <div class="location-distance" id="jarakSementara">Menghitung jarak...</div>
+                    </div>
+                </div>
+                <div class="distance-bar-container">
+                    <div class="distance-bar" id="progressSementara" style="width: 0%"></div>
+                </div>
+                <div class="distance-status" id="statusSementara">📍 Di luar radius</div>
+            </div>
 
-        <div class="location-item" id="lokasiKantor">
-            <div class="location-header">
-                <span class="location-icon">🏢</span>
-                <div class="location-info">
-                    <div class="location-name" id="namaKantor">Kantor Pusat</div>
-                    <div class="location-distance" id="jarakKantor">Menghitung jarak...</div>
+            <div class="location-item" id="lokasiKantor">
+                <div class="location-header">
+                    <span class="location-icon">🏢</span>
+                    <div class="location-info">
+                        <div class="location-name" id="namaKantor">Kantor Pusat</div>
+                        <div class="location-distance" id="jarakKantor">Menghitung jarak...</div>
+                    </div>
                 </div>
-            </div>
-            <div class="distance-bar-container">
-                <div class="distance-bar" id="progressKantor" style="width: 0%"></div>
-            </div>
-            <div class="distance-status" id="statusKantor">📍 Di luar radius</div>
-        </div>
-        
-        <div class="location-item" id="lokasiKelurahan">
-            <div class="location-header">
-                <span class="location-icon">🏘️</span>
-                <div class="location-info">
-                    <div class="location-name" id="namaKelurahan">Kelurahan Dampingan</div>
-                    <div class="location-distance" id="jarakKelurahan">Menghitung jarak...</div>
+                <div class="distance-bar-container">
+                    <div class="distance-bar" id="progressKantor" style="width: 0%"></div>
                 </div>
+                <div class="distance-status" id="statusKantor">📍 Di luar radius</div>
             </div>
-            <div class="distance-bar-container">
-                <div class="distance-bar" id="progressKelurahan" style="width: 0%"></div>
+            
+            <div class="location-item" id="lokasiKelurahan">
+                <div class="location-header">
+                    <span class="location-icon">🏘️</span>
+                    <div class="location-info">
+                        <div class="location-name" id="namaKelurahan">Kelurahan Dampingan</div>
+                        <div class="location-distance" id="jarakKelurahan">Menghitung jarak...</div>
+                    </div>
+                </div>
+                <div class="distance-bar-container">
+                    <div class="distance-bar" id="progressKelurahan" style="width: 0%"></div>
+                </div>
+                <div class="distance-status" id="statusKelurahan">📍 Di luar radius</div>
             </div>
-            <div class="distance-status" id="statusKelurahan">📍 Di luar radius</div>
-        </div>
 
+        </div>
     </div>
-</div>
     
     <!-- REKAP HARI INI -->
     <div class="card">
@@ -144,7 +144,10 @@
     
     <!-- LOADING OVERLAY -->
     <div class="loading-overlay" id="loading">
-        <div class="loading-spinner"></div>
+        <!-- Video Loading MP4 -->
+        <video class="loading-video" autoplay loop muted playsinline>
+            <source src="loading.mp4" type="video/mp4">
+        </video>
         <div class="loading-text">Memuat...</div>
     </div>
     
