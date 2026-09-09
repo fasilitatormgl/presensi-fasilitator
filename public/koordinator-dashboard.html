@@ -236,8 +236,13 @@
         </div>
     </div>
     
+<!-- LOADING OVERLAY -->
     <div class="loading-overlay" id="loading">
-        <div class="loading-spinner"></div>
+        <!-- Video Loading MP4 -->
+        <video class="loading-video" autoplay loop muted playsinline>
+            <source src="loading.mp4" type="video/mp4">
+        </video>
+        <div class="loading-text">Memuat...</div>
     </div>
     
     <div class="modal" id="errorModal" style="display: none;">
