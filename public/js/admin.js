@@ -3760,82 +3760,31 @@ window.exportData =
         }
 
     };
-
-
 // =====================================================
 // TEMPLATE
 // =====================================================
 
-window.downloadTemplate =
-    function() {
+window.downloadTemplate = function() {
+    // Buat Workbook (File Excel) baru
+    const wb = XLSX.utils.book_new();
 
-        const template = [
+    // 1. Sheet untuk USER
+    const userTemplate = [
+        ["nama", "email", "password", "role", "kecamatan", "kelurahan", "kota"],
+        ["Mas Fawaid", "fawaid@mail.com", "123456", "user", "Magelang Utara", "Wates", "Magelang"]
+    ];
+    const wsUsers = XLSX.utils.aoa_to_sheet(userTemplate);
+    XLSX.utils.book_append_sheet(wb, wsUsers, "Users");
 
-            ["USER"],
+    // 2. Sheet untuk LOKASI
+    const lokasiTemplate = [
+        ["nama", "tipe", "lat", "lng", "radius"],
+        ["Kelurahan Wates", "kelurahan", "-7.4623", "110.2189", "100"],
+        ["Kantor DPMP4KB", "kantor", "-7.4706", "110.2177", "100"]
+    ];
+    const wsLokasi = XLSX.utils.aoa_to_sheet(lokasiTemplate);
+    XLSX.utils.book_append_sheet(wb, wsLokasi, "Lokasi");
 
-            [
-                "nama",
-                "email",
-                "password",
-                "role",
-                "kecamatan",
-                "kelurahan",
-                "kota"
-            ],
-
-            [
-                "Budi",
-                "budi@mail.com",
-                "123456",
-                "user",
-                "Magelang Tengah",
-                "Magelang",
-                "Magelang"
-            ],
-
-            [""],
-
-            ["LOKASI"],
-
-            [
-                "nama",
-                "tipe",
-                "lat",
-                "lng",
-                "radius"
-            ],
-
-            [
-                "Kantor Pusat",
-                "kantor",
-                "-7.4706",
-                "110.2177",
-                "100"
-            ]
-
-        ];
-
-
-        const wb =
-            XLSX.utils.book_new();
-
-
-        const ws =
-            XLSX.utils.aoa_to_sheet(
-                template
-            );
-
-
-        XLSX.utils.book_append_sheet(
-            wb,
-            ws,
-            "Template"
-        );
-
-
-        XLSX.writeFile(
-            wb,
-            "template_import.xlsx"
-        );
-
-    };
+    // Simpan file
+    XLSX.writeFile(wb, "Template_Data_Prodamai.xlsx");
+};
