@@ -1,5 +1,5 @@
 import { db } from "./firebase-init.js"
-import { collection, addDoc, getDocs, query, where, doc, setDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js"
+import { collection, getDocs, query, where, doc, setDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js"
 import { getAuth, createUserWithEmailAndPassword, fetchSignInMethodsForEmail } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js"
 
 export async function importFromExcel(file) {
@@ -16,22 +16,23 @@ export async function importFromExcel(file) {
                 
                 let result = { users: 0, lokasi: 0, skipped: 0, errors: [] }
                 
-                // ========== IMPORT USERS DENGAN BATCH ==========
-                if (workbook.SheetNames.includes('USER')) {
-                    console.log("👥 Processing USER sheet...")
-                    const sheet = workbook.Sheets['USER']
+                // Deteksi nama sheet secara fleksibel (USER / Users)
+                const userSheetName = workbook.SheetNames.find(name => name.toUpperCase() === 'USER' || name.toUpperCase() === 'USERS');
+                
+                // ========== IMPORT USERS ==========
+                if (userSheetName) {
+                    console.log(`👥 Processing user sheet (${userSheetName})...`)
+                    const sheet = workbook.Sheets[userSheetName]
                     const users = XLSX.utils.sheet_to_json(sheet)
                     
                     console.log(`📊 Found ${users.length} users`)
                     
-                    // Proses users satu per satu karena perlu Auth
                     for (let i = 0; i < users.length; i++) {
                         const user = users[i]
                         
                         try {
                             console.log(`⏳ Processing user ${i + 1}/${users.length}: ${user.email || 'no email'}`)
                             
-                            // Validasi data
                             if (!user.nama || !user.email || !user.password || !user.role) {
                                 console.warn(`⚠️ Incomplete data:`, user)
                                 result.errors.push(`User ${i+1}: Data tidak lengkap`)
@@ -39,7 +40,6 @@ export async function importFromExcel(file) {
                                 continue
                             }
                             
-                            // Validasi email
                             if (!user.email.includes('@')) {
                                 console.warn(`⚠️ Invalid email: ${user.email}`)
                                 result.errors.push(`User ${i+1}: Email tidak valid (${user.email})`)
@@ -47,7 +47,6 @@ export async function importFromExcel(file) {
                                 continue
                             }
                             
-                            // Cek email di Authentication
                             const auth = getAuth()
                             let methods = []
                             try {
@@ -63,13 +62,12 @@ export async function importFromExcel(file) {
                                 continue
                             }
                             
-                            // BUAT USER DI AUTHENTICATION
                             let userCredential
                             try {
                                 userCredential = await createUserWithEmailAndPassword(
                                     auth,
                                     user.email,
-                                    user.password
+                                    String(user.password)
                                 )
                                 console.log(`✅ Auth created: ${user.email} with UID: ${userCredential.user.uid}`)
                             } catch (authError) {
@@ -79,13 +77,15 @@ export async function importFromExcel(file) {
                                 continue
                             }
                             
-                            // Data user
                             const userData = {
                                 uid: userCredential.user.uid,
                                 nama: user.nama,
                                 email: user.email,
+                                password: String(user.password),
                                 role: user.role,
-                                kelurahan: user.kelurahan || null,
+                                kecamatan: user.kecamatan || "",
+                                kelurahan: user.kelurahan || "",
+                                kota: user.kota || "Magelang",
                                 deviceId: null,
                                 deviceCheckEnabled: true,
                                 deviceResetAt: new Date(),
@@ -94,7 +94,6 @@ export async function importFromExcel(file) {
                                 createdAt: new Date()
                             }
                             
-                            // Simpan ke Firestore dengan UID sebagai document ID
                             await setDoc(doc(db, "users", userCredential.user.uid), userData);
                             console.log(`✅ User saved with UID as document ID: ${userCredential.user.uid}`);
                             
@@ -106,23 +105,24 @@ export async function importFromExcel(file) {
                             result.skipped++
                         }
                         
-                        // Jeda 500ms
-                        await new Promise(resolve => setTimeout(resolve, 500))
+                        await new Promise(resolve => setTimeout(resolve, 300))
                     }
                 } else {
                     console.warn("⚠️ USER sheet not found")
                     result.errors.push("Sheet USER tidak ditemukan")
                 }
                 
+                // Deteksi nama sheet lokasi secara fleksibel (LOKASI / Lokasi)
+                const lokasiSheetName = workbook.SheetNames.find(name => name.toUpperCase() === 'LOKASI' || name.toUpperCase() === 'LOKASIS');
+
                 // ========== IMPORT LOKASI DENGAN BATCH ==========
-                if (workbook.SheetNames.includes('LOKASI')) {
-                    console.log("📍 Processing LOKASI sheet with BATCH...")
-                    const sheet = workbook.Sheets['LOKASI']
+                if (lokasiSheetName) {
+                    console.log(`📍 Processing location sheet (${lokasiSheetName}) with BATCH...`)
+                    const sheet = workbook.Sheets[lokasiSheetName]
                     const lokasiList = XLSX.utils.sheet_to_json(sheet)
                     
                     console.log(`📊 Found ${lokasiList.length} locations`)
                     
-                    // Gunakan batch untuk menulis banyak lokasi sekaligus
                     const batch = writeBatch(db);
                     let batchCount = 0;
                     
@@ -132,26 +132,24 @@ export async function importFromExcel(file) {
                         try {
                             console.log(`⏳ Processing location ${i + 1}/${lokasiList.length}: ${loc.nama || 'no name'}`)
                             
-                            // Validasi
-                            if (!loc.nama || !loc.tipe || !loc.lat || !loc.lng) {
+                            if (!loc.nama || !loc.tipe || loc.lat === undefined || loc.lng === undefined) {
                                 console.warn(`⚠️ Incomplete location data:`, loc)
                                 result.errors.push(`Lokasi ${i+1}: Data tidak lengkap`)
                                 result.skipped++
                                 continue
                             }
                             
-                            // Validasi tipe
-                            if (loc.tipe !== 'kantor' && loc.tipe !== 'kelurahan') {
+                            const tipeLower = String(loc.tipe).trim().toLowerCase();
+                            if (tipeLower !== 'kantor' && tipeLower !== 'kelurahan') {
                                 console.warn(`⚠️ Invalid type: ${loc.tipe}`)
                                 result.errors.push(`Lokasi ${i+1}: Tipe harus 'kantor'/'kelurahan'`)
                                 result.skipped++
                                 continue
                             }
                             
-                            // Cek duplikat (tetap perlu read)
                             const q = query(
                                 collection(db, "lokasi"),
-                                where("nama", "==", loc.nama)
+                                where("nama", "==", String(loc.nama).trim())
                             )
                             const existing = await getDocs(q)
                             
@@ -162,20 +160,19 @@ export async function importFromExcel(file) {
                                 continue
                             }
                             
-                            // Tambah ke batch
                             const docRef = doc(collection(db, "lokasi"));
                             batch.set(docRef, {
-                                nama: loc.nama,
-                                tipe: loc.tipe,
+                                nama: String(loc.nama).trim(),
+                                tipe: tipeLower,
                                 lat: parseFloat(loc.lat),
                                 lng: parseFloat(loc.lng),
+                                radius: parseInt(loc.radius) || 100,
                                 createdAt: new Date()
                             });
                             
                             batchCount++;
                             result.lokasi++;
                             
-                            // Commit batch setiap 20 dokumen
                             if (batchCount >= 20) {
                                 await batch.commit();
                                 console.log(`✅ Batch committed (${batchCount} locations)`);
@@ -189,7 +186,6 @@ export async function importFromExcel(file) {
                         }
                     }
                     
-                    // Commit sisa batch
                     if (batchCount > 0) {
                         await batch.commit();
                         console.log(`✅ Final batch committed (${batchCount} locations)`);
@@ -201,7 +197,6 @@ export async function importFromExcel(file) {
                 }
                 
                 console.log("🎉 IMPORT COMPLETED!", result)
-                
                 resolve(result)
                 
             } catch (error) {
