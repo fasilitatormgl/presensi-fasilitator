@@ -1464,6 +1464,43 @@ window.saveUser =
 
 
 // =====================================================
+// DELETE USER (FUNGSI BARU)
+// =====================================================
+
+window.deleteUser = async function(id, nama) {
+    
+    if (!confirm(`⚠️ Yakin ingin menghapus profil user "${nama}" dari sistem secara permanen? \n\n(Ini akan menghapusnya dari daftar fasilitator dan tabel rekap presensi).`)) {
+        return;
+    }
+
+    try {
+        showLoading(true);
+
+        // Hapus dokumen user langsung dari Firestore Database
+        await deleteDoc(doc(db, "users", id));
+
+        alert("✅ Data user berhasil dihapus dari sistem presensi.");
+
+        // Bersihkan cache dan muat ulang tabel/statistik
+        clearCache();
+        
+        await loadUsers(true);
+        await loadStats(true);
+        await loadPresensi();
+        
+        // Render ulang tampilan User Manager
+        loadUserManager();
+
+    } catch (error) {
+        console.error("Gagal menghapus user:", error);
+        alert("❌ Gagal menghapus user: " + error.message);
+    } finally {
+        showLoading(false);
+    }
+};
+
+
+// =====================================================
 // USER MANAGER
 // =====================================================
 
@@ -1616,6 +1653,12 @@ function renderUserManager(
                             class="btn-location"
                             onclick="resetDevice('${user.uid}')">
                             📱 Reset Device
+                        </button>
+
+                        <button
+                            class="btn-delete-small"
+                            onclick="deleteUser('${user.id}', '${escapeHtml(user.nama)}')">
+                            🗑️ Hapus
                         </button>
 
                     </div>
