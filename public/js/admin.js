@@ -1464,12 +1464,22 @@ window.saveUser =
 
 
 // =====================================================
-// DELETE USER (FUNGSI BARU)
+// DELETE USER (FUNGSI BARU DENGAN DOUBLE KONFIRMASI)
 // =====================================================
 
 window.deleteUser = async function(id, nama) {
     
-    if (!confirm(`⚠️ Yakin ingin menghapus profil user "${nama}" dari sistem secara permanen? \n\n(Ini akan menghapusnya dari daftar fasilitator dan tabel rekap presensi).`)) {
+    // Konfirmasi Pertama: Peringatan standar
+    if (!confirm(`⚠️ PERHATIAN: Anda akan menghapus profil user "${nama}" secara permanen.\n\nData presensi terkait user ini mungkin akan kehilangan referensi nama. Lanjutkan?`)) {
+        return;
+    }
+
+    // Konfirmasi Kedua: Meminta input teks untuk memastikan tindakan disengaja
+    const konfirmasiTeks = prompt(`Ketik "HAPUS" (tanpa tanda kutip) untuk mengonfirmasi penghapusan user ${nama}:`);
+    
+    // Jika admin menekan cancel atau mengetik selain "HAPUS"
+    if (konfirmasiTeks !== "HAPUS") {
+        alert("❌ Penghapusan dibatalkan. Konfirmasi teks tidak sesuai.");
         return;
     }
 
@@ -1479,7 +1489,7 @@ window.deleteUser = async function(id, nama) {
         // Hapus dokumen user langsung dari Firestore Database
         await deleteDoc(doc(db, "users", id));
 
-        alert("✅ Data user berhasil dihapus dari sistem presensi.");
+        alert("✅ Data user berhasil dihapus permanen dari sistem.");
 
         // Bersihkan cache dan muat ulang tabel/statistik
         clearCache();
@@ -1498,7 +1508,6 @@ window.deleteUser = async function(id, nama) {
         showLoading(false);
     }
 };
-
 
 // =====================================================
 // USER MANAGER
