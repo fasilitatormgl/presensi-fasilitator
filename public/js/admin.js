@@ -3771,7 +3771,7 @@ window.downloadTemplate = function() {
     // 1. Sheet untuk USER
     const userTemplate = [
         ["nama", "email", "password", "role", "kecamatan", "kelurahan", "kota"],
-        ["Mas Fawaid", "fawaid@mail.com", "123456", "user", "Magelang Utara", "Wates", "Magelang"]
+        ["Mas Chandra", "chandra@mail.com", "123456", "user", "Magelang Selatan", "Jurangombo Utara", "Magelang"]
     ];
     const wsUsers = XLSX.utils.aoa_to_sheet(userTemplate);
     XLSX.utils.book_append_sheet(wb, wsUsers, "Users");
